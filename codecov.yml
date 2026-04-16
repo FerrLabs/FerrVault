@@ -1,0 +1,15 @@
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+
+ignore:
+  - ".github/**"
+  - "config/**"        # kubebuilder-generated manifests — not application code
+  - "hack/**"          # build/codegen scripts
+  - "**/zz_generated_*.go"  # CRD DeepCopy etc. — generated
+  - "main.go"          # tiny entrypoint, covered indirectly
