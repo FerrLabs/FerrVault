@@ -1,5 +1,11 @@
 # ferrflow-operator
 
+[![CI](https://github.com/FerrFlow-Org/FerrFlow-Operator/actions/workflows/ci.yml/badge.svg)](https://github.com/FerrFlow-Org/FerrFlow-Operator/actions/workflows/ci.yml)
+[![Release](https://github.com/FerrFlow-Org/FerrFlow-Operator/actions/workflows/release.yml/badge.svg)](https://github.com/FerrFlow-Org/FerrFlow-Operator/actions/workflows/release.yml)
+[![Latest release](https://img.shields.io/github/v/release/FerrFlow-Org/FerrFlow-Operator)](https://github.com/FerrFlow-Org/FerrFlow-Operator/releases/latest)
+[![Coverage](https://codecov.io/gh/FerrFlow-Org/FerrFlow-Operator/graph/badge.svg)](https://codecov.io/gh/FerrFlow-Org/FerrFlow-Operator)
+[![License](https://img.shields.io/github/license/FerrFlow-Org/FerrFlow-Operator)](LICENSE)
+
 Kubernetes operator that syncs secrets stored in [FerrFlow](https://ferrflow.com) into native Kubernetes `Secret` resources, with optional rolling restart of the workloads that consume them.
 
 > **Status: pre-alpha / scaffolding.** No reconciler is implemented yet. The design is tracked in [issue #1](https://github.com/FerrFlow-Org/FerrFlow-Operator/issues/1).
