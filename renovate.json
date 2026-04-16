@@ -1,0 +1,33 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "rebaseWhen": "behind-base-branch",
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["patch", "minor"],
+      "matchCategories": ["golang"],
+      "automerge": true,
+      "automergeType": "pr",
+      "automergeStrategy": "squash"
+    },
+    {
+      "matchUpdateTypes": ["major"],
+      "labels": ["dependencies", "major", "renovate"],
+      "automerge": false
+    },
+    {
+      "matchCategories": ["ci"],
+      "automerge": true,
+      "automergeType": "pr",
+      "automergeStrategy": "squash",
+      "groupName": "GitHub Actions"
+    },
+    {
+      "matchCategories": ["docker"],
+      "automerge": true,
+      "automergeType": "pr",
+      "automergeStrategy": "squash",
+      "groupName": "Docker images"
+    }
+  ]
+}
