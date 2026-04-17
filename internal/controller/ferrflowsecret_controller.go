@@ -83,8 +83,12 @@ func (r *FerrFlowSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		if ferrflow.IsNotFound(err) {
 			return r.failReadyWithRequeue(ctx, &cr, "VaultNotFound", err.Error(), r.refreshInterval(&cr))
 		}
-		// Transport or 5xx: shorter backoff, let controller-runtime retry.
-		return ctrl.Result{}, err
+		// Transport or 5xx: stamp status so the CR surfaces the failure, then
+		// requeue at the normal cadence. Returning the raw error would make
+		// controller-runtime retry in a tight loop without ever updating the
+		// CR's Ready condition — observable as "Reconciler error" spam with no
+		// user-visible signal.
+		return r.failReadyWithRequeue(ctx, &cr, "Unreachable", err.Error(), r.refreshInterval(&cr))
 	}
 
 	// --- 4. Materialise the target Secret.
