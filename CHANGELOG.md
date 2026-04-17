@@ -4,6 +4,12 @@ All notable changes to `ferrflow-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [0.2.0] - 2026-04-17
+
+### Features
+
+- feat: add Helm chart + Docker/chart publish workflow (#10)
+
 ## [0.1.0] - 2026-04-17
 
 ### Features
