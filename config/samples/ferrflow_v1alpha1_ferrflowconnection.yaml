@@ -1,0 +1,25 @@
+# Example FerrFlowConnection. Create one per (namespace, FerrFlow org) pair.
+# Multiple FerrFlowSecret CRs in the same namespace can reference the same
+# connection.
+apiVersion: ferrflow.io/v1alpha1
+kind: FerrFlowConnection
+metadata:
+  name: prod
+  namespace: default
+spec:
+  url: https://ferrflow.example.com
+  organization: acme
+  tokenSecretRef:
+    name: ferrflow-api-token
+    key: token
+---
+# The Secret the connection points at. You'd typically create this via
+# sealed-secrets / External Secrets / vault, not commit the raw value.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ferrflow-api-token
+  namespace: default
+type: Opaque
+stringData:
+  token: fft_replace_me

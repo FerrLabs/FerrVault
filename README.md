@@ -6,13 +6,17 @@
 [![Coverage](https://codecov.io/gh/FerrFlow-Org/FerrFlow-Operator/graph/badge.svg)](https://codecov.io/gh/FerrFlow-Org/FerrFlow-Operator)
 [![License](https://img.shields.io/github/license/FerrFlow-Org/FerrFlow-Operator)](LICENSE)
 
-Kubernetes operator that syncs secrets stored in [FerrFlow](https://ferrflow.com) into native Kubernetes `Secret` resources, with optional rolling restart of the workloads that consume them.
+Kubernetes operator that syncs secrets stored in [FerrFlow](https://ferrflow.com) into native Kubernetes `Secret` resources.
 
-> **Status: pre-alpha / scaffolding.** No reconciler is implemented yet. The design is tracked in [issue #1](https://github.com/FerrFlow-Org/FerrFlow-Operator/issues/1).
+> **Status: alpha.** The MVP reconciler is in place — it reads secrets from a FerrFlow vault via the bulk-reveal API and materialises them into a Kubernetes Secret, with owner-ref GC and status conditions. Rolling restarts, Helm chart, and integration tests are tracked in [issue #1](https://github.com/FerrFlow-Org/FerrFlow-Operator/issues/1).
 
-## What it will do
+## Custom resources
 
-Given a FerrFlow project + environment, the operator watches a `FerrFlowSecret` custom resource and keeps a matching Kubernetes `Secret` in sync:
+Two CRDs under `ferrflow.io/v1alpha1`:
+
+### `FerrFlowConnection` (shortname `ffc`)
+
+Declares how to reach a FerrFlow instance. One per (namespace, org). Shared by every `FerrFlowSecret` in that namespace that targets the same organization.
 
 ```yaml
 apiVersion: ferrflow.io/v1alpha1
@@ -21,10 +25,19 @@ metadata:
   name: prod
 spec:
   url: https://ferrflow.example.com
+  organization: acme
   tokenSecretRef:
     name: ferrflow-api-token
     key: token
----
+```
+
+The referenced Secret must hold a FerrFlow API token (`fft_...`) with at least the `secrets:read` scope.
+
+### `FerrFlowSecret` (shortname `ffs`)
+
+Declares a sync from a vault to a Kubernetes Secret.
+
+```yaml
 apiVersion: ferrflow.io/v1alpha1
 kind: FerrFlowSecret
 metadata:
@@ -32,27 +45,44 @@ metadata:
 spec:
   connectionRef: { name: prod }
   project: web
-  environment: production
+  vault: production          # FerrFlow vault name (often the environment)
   selector:
-    names: [DATABASE_URL, STRIPE_KEY]
+    names: [DATABASE_URL, STRIPE_KEY]   # omit to sync every key in the vault
   target:
-    name: web-env
-  refreshInterval: 1h
-  rolloutRestart:
-    - { kind: Deployment, name: web }
+    name: web-env            # target Secret name; defaults to metadata.name
+    type: Opaque
+  refreshInterval: 30m       # Go time.Duration; 0s disables scheduled refresh
 ```
 
-On each reconciliation the operator fetches the listed secrets from the FerrFlow API, writes them to the target `Secret`, and — if `rolloutRestart` is set — annotates the named workloads to trigger a rolling update.
+On reconciliation the operator calls `GET /api/v1/orgs/:org/projects/:project/vaults/by-name/:vault/secrets/reveal` once, writes the returned `{name: value}` map into `spec.target.name`, and sets the CR's `Ready` condition based on whether any requested keys were missing upstream.
+
+The generated Secret is owned by the CR — deleting the CR garbage-collects the Secret.
+
+## Running
+
+### In-cluster
+
+```bash
+kubectl apply -f config/crd/bases/
+kubectl create namespace ferrflow-operator-system
+kubectl apply -f config/rbac/
+# Deployment manifests (Helm chart) are still to come — see issue #1.
+```
+
+### Locally against a cluster
+
+```bash
+make install-crds
+make run
+```
 
 ## Prerequisites in FerrFlow
 
-The operator has no value until the following ship in [FerrFlow-Org/Application](https://github.com/FerrFlow-Org/Application):
+The operator relies on endpoints in [`FerrFlow-Org/Application`](https://github.com/FerrFlow-Org/Application) that shipped in `api@v4.0.0`:
 
-- FerrFlow Secrets feature (project-scoped, AES-GCM at rest)
-- Long-lived API tokens with per-project scopes
-- A `reveal` endpoint exposing decrypted secret values, rate-limited and audit-logged
-
-See issue #1 for the full prerequisite list and phased plan.
+- API token auth (`Authorization: Bearer fft_...`) with granular scopes — #268
+- `secrets:read` scope enforcement on all secrets routes — #268
+- Bulk reveal endpoint — #277
 
 ## Contributing
 
