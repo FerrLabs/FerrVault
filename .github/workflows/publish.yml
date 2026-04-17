@@ -1,0 +1,101 @@
+name: Publish
+
+# Triggered after FerrFlow cuts a release commit (`chore(release): …`) on
+# main. The release commit carries a `v*` tag; we key this workflow off the
+# tag push so we pick up the version exactly as FerrFlow tagged it.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (without leading v)"
+        required: true
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write   # cosign / provenance if added later
+
+jobs:
+  resolve:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      major: ${{ steps.v.outputs.major }}
+    steps:
+      - id: v
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            V="${{ inputs.version }}"
+          else
+            V="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "major=${V%%.*}" >> "$GITHUB_OUTPUT"
+          echo "Publishing version $V (major $( echo $V | cut -d. -f1 ))"
+
+  docker:
+    name: Docker image
+    needs: resolve
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push (amd64, arm64)
+        uses: docker/build-push-action@v8
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/ferrflow-org/ferrflow-operator:${{ needs.resolve.outputs.version }}
+            ghcr.io/ferrflow-org/ferrflow-operator:v${{ needs.resolve.outputs.major }}
+            ghcr.io/ferrflow-org/ferrflow-operator:latest
+          # Embed the git SHA and build time so `docker inspect` is useful.
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ needs.resolve.outputs.version }}
+            org.opencontainers.image.licenses=MPL-2.0
+            org.opencontainers.image.revision=${{ github.sha }}
+          # Inline cache — cheap enough on a small binary, no separate registry.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  helm:
+    name: Helm chart
+    needs: [resolve, docker]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+      - name: Sync chart version with release
+        run: |
+          V="${{ needs.resolve.outputs.version }}"
+          # `version` = chart version, `appVersion` = operator version.
+          # We keep them in lock-step — one release cuts both.
+          sed -i -E "s/^version: .*/version: $V/" charts/ferrflow-operator/Chart.yaml
+          sed -i -E "s/^appVersion: .*/appVersion: \"$V\"/" charts/ferrflow-operator/Chart.yaml
+          echo "--- Chart.yaml head ---"
+          head -n 15 charts/ferrflow-operator/Chart.yaml
+      - name: Lint
+        run: helm lint charts/ferrflow-operator
+      - name: Package
+        run: helm package charts/ferrflow-operator -d dist/
+      - name: Push to GHCR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GH_TOKEN" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+          helm push dist/ferrflow-operator-${{ needs.resolve.outputs.version }}.tgz oci://ghcr.io/ferrflow-org/charts

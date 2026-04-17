@@ -1,0 +1,15 @@
+# Patterns excluded from the packaged chart tarball.
+.DS_Store
+.git/
+.gitignore
+.project
+.idea/
+*.tmproj
+.vscode/
+*.swp
+*.bak
+*.tmp
+*.orig
+*~
+# Helm tooling artefacts
+OWNERS
