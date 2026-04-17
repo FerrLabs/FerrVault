@@ -40,6 +40,11 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - name: Resolve dependencies
+        # Populates go.sum (and any missing indirect deps in go.mod). A proper
+        # `go mod tidy` drift check will come back once we have a `tidy` bot —
+        # today it would flag the bootstrap commit as "stale" on every run.
+        run: go mod tidy
       - name: gofmt
         run: |
           diff=$(gofmt -l .)
@@ -63,6 +68,11 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - name: Resolve dependencies
+        # Populates go.sum (and any missing indirect deps in go.mod). A proper
+        # `go mod tidy` drift check will come back once we have a `tidy` bot —
+        # today it would flag the bootstrap commit as "stale" on every run.
+        run: go mod tidy
       - name: Go test
         run: go test -race -coverprofile=coverage.out ./...
       - uses: codecov/codecov-action@v6
@@ -82,5 +92,10 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - name: Resolve dependencies
+        # Populates go.sum (and any missing indirect deps in go.mod). A proper
+        # `go mod tidy` drift check will come back once we have a `tidy` bot —
+        # today it would flag the bootstrap commit as "stale" on every run.
+        run: go mod tidy
       - name: Build manager
         run: go build -o bin/manager ./cmd/...
