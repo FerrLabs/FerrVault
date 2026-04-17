@@ -16,7 +16,7 @@
       "automerge": false
     },
     {
-      "matchCategories": ["ci"],
+      "matchManagers": ["github-actions"],
       "automerge": true,
       "automergeType": "pr",
       "automergeStrategy": "squash",
