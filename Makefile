@@ -6,6 +6,7 @@
 
 SHELL := /usr/bin/env bash
 IMG ?= ghcr.io/ferrflow-org/ferrflow-operator:dev
+CHART_DIR := charts/ferrflow-operator
 
 .PHONY: help
 help:
@@ -19,6 +20,10 @@ help:
 	@echo "  uninstall-crds   Remove CRDs from the current kubectl context."
 	@echo "  deploy-rbac      Apply the operator ServiceAccount, Role, Binding."
 	@echo "  run              Run the manager against the current kubectl context."
+	@echo "  helm-lint        Run 'helm lint' on charts/ferrflow-operator."
+	@echo "  helm-template    Render the chart and print to stdout (sanity check)."
+	@echo "  helm-package     Package the chart into dist/."
+	@echo "  helm-install     helm upgrade --install against the current context."
 
 .PHONY: fmt
 fmt:
@@ -56,3 +61,23 @@ deploy-rbac:
 .PHONY: run
 run: build
 	./bin/manager --leader-elect=false
+
+# --- Helm ---
+
+.PHONY: helm-lint
+helm-lint:
+	helm lint $(CHART_DIR)
+
+.PHONY: helm-template
+helm-template:
+	helm template ferrflow-operator $(CHART_DIR) --debug
+
+.PHONY: helm-package
+helm-package:
+	mkdir -p dist
+	helm package $(CHART_DIR) -d dist/
+
+.PHONY: helm-install
+helm-install:
+	helm upgrade --install ferrflow-operator $(CHART_DIR) \
+		--namespace ferrflow-operator-system --create-namespace

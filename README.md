@@ -60,20 +60,30 @@ The generated Secret is owned by the CR — deleting the CR garbage-collects the
 
 ## Running
 
-### In-cluster
+### Helm (recommended)
+
+```bash
+helm install ferrflow-operator oci://ghcr.io/ferrflow-org/charts/ferrflow-operator \
+  --namespace ferrflow-operator-system --create-namespace
+```
+
+Upgrade: `helm upgrade` against the same release. CRDs carry `helm.sh/resource-policy: keep` so they survive uninstall (protects your CRs + managed Secrets). See [`charts/ferrflow-operator/README.md`](charts/ferrflow-operator/README.md) for the full `values.yaml` reference.
+
+### Locally against a cluster
+
+```bash
+make install-crds   # CRDs only
+make run            # runs the manager as your user, not as a Pod
+```
+
+### Raw manifests (without Helm)
 
 ```bash
 kubectl apply -f config/crd/bases/
 kubectl create namespace ferrflow-operator-system
 kubectl apply -f config/rbac/
-# Deployment manifests (Helm chart) are still to come — see issue #1.
-```
-
-### Locally against a cluster
-
-```bash
-make install-crds
-make run
+# You still need a Deployment — render one from the chart:
+#   helm template ferrflow-operator charts/ferrflow-operator > manager.yaml
 ```
 
 ## Prerequisites in FerrFlow
