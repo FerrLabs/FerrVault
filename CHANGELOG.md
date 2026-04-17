@@ -4,6 +4,12 @@ All notable changes to `ferrflow-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [0.2.2] - 2026-04-17
+
+### Bug Fixes
+
+- fix(docker): run go mod tidy in builder since go.sum is not committed (#13)
+
 ## [0.2.1] - 2026-04-17
 
 ### Bug Fixes
