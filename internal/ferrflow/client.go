@@ -97,7 +97,7 @@ func (c *Client) BulkReveal(
 	if err != nil {
 		return nil, &TransportError{Underlying: err}
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, readErr := io.ReadAll(resp.Body)
 	if readErr != nil {
