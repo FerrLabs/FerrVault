@@ -159,7 +159,6 @@ func (in *FerrFlowConnectionStatus) DeepCopyInto(out *FerrFlowConnectionStatus) 
 		}
 	}
 	if in.LastCheckedAt != nil {
-		t := in.LastCheckedAt.DeepCopy()
-		out.LastCheckedAt = &t
+		out.LastCheckedAt = in.LastCheckedAt.DeepCopy()
 	}
 }

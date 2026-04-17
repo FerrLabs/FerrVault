@@ -245,8 +245,7 @@ func (in *FerrFlowSecretStatus) DeepCopyInto(out *FerrFlowSecretStatus) {
 		}
 	}
 	if in.LastSyncedAt != nil {
-		t := in.LastSyncedAt.DeepCopy()
-		out.LastSyncedAt = &t
+		out.LastSyncedAt = in.LastSyncedAt.DeepCopy()
 	}
 	if in.SyncedKeys != nil {
 		out.SyncedKeys = make([]string, len(in.SyncedKeys))
