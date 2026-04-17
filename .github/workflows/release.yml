@@ -27,7 +27,7 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.FERRFLOW_TOKEN }}
-      - uses: FerrFlow-Org/ferrflow@v2
+      - uses: FerrFlow-Org/ferrflow@v3
         id: ferrflow
         with:
           dry-run: ${{ inputs.dry_run == true }}
