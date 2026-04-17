@@ -44,7 +44,7 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - uses: helm/kind-action@v2
+      - uses: helm/kind-action@v1
         if: steps.gate.outputs.has_go == 'true'
         with:
           cluster_name: ferrflow-e2e
