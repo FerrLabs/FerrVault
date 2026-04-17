@@ -1,0 +1,56 @@
+ferrflow-operator {{ .Chart.AppVersion }} has been installed in namespace {{ .Release.Namespace }}.
+
+Next steps:
+
+1. Create a FerrFlow API token with at least `secrets:read`, and stash it in a
+   Kubernetes Secret in the namespace where you'll create your
+   FerrFlowConnection:
+
+   kubectl create secret generic ferrflow-api-token \
+     --from-literal=token=fft_xxx_yyy \
+     -n default
+
+2. Create a FerrFlowConnection pointing at your FerrFlow instance:
+
+   apiVersion: ferrflow.io/v1alpha1
+   kind: FerrFlowConnection
+   metadata:
+     name: prod
+     namespace: default
+   spec:
+     url: https://ferrflow.example.com
+     organization: your-org-slug
+     tokenSecretRef:
+       name: ferrflow-api-token
+       key: token
+
+3. Create a FerrFlowSecret to start syncing:
+
+   apiVersion: ferrflow.io/v1alpha1
+   kind: FerrFlowSecret
+   metadata:
+     name: web-env
+     namespace: default
+   spec:
+     connectionRef: { name: prod }
+     project: web
+     vault: production
+     selector:
+       names: [DATABASE_URL, STRIPE_KEY]
+
+4. Watch it reconcile:
+
+   kubectl get ferrflowsecrets,secrets -n default
+   kubectl describe ferrflowsecret web-env -n default
+   kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name={{ include "ferrflow-operator.name" . }} -f
+
+{{- if not .Values.crds.install }}
+
+CRDs were NOT installed by this chart (`crds.install=false`). Apply them
+manually before creating any FerrFlow CRs:
+
+   kubectl apply -f https://raw.githubusercontent.com/FerrFlow-Org/FerrFlow-Operator/v{{ .Chart.AppVersion }}/charts/ferrflow-operator/crds/
+{{- end }}
+
+Documentation: https://ferrflow.com/docs
+Repository:    https://github.com/FerrFlow-Org/FerrFlow-Operator

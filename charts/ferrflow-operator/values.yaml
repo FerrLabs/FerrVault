@@ -1,0 +1,112 @@
+# Default values for ferrflow-operator.
+# Copy this file and override what you need with `-f my-values.yaml`.
+
+# --- Image ---
+image:
+  repository: ghcr.io/ferrflow-org/ferrflow-operator
+  # Leave tag empty to fall back to `.Chart.AppVersion`. Override for pinning
+  # to a specific commit / prerelease.
+  tag: ""
+  pullPolicy: IfNotPresent
+# Pull secrets if the image lives in a private registry.
+imagePullSecrets: []
+
+# --- Replicas & leader election ---
+# With leader election enabled, running more than one replica is safe (only
+# the elected leader reconciles). We default to 1 to keep resource use low.
+replicaCount: 1
+leaderElection:
+  enabled: true
+  # Lease name in the kube-system coordinated store. Change if you run several
+  # independent instances of the operator in the same cluster.
+  id: ferrflow-operator.ferrflow.io
+
+# --- Scope ---
+# Empty string = cluster-wide (operator watches every namespace). Set to a
+# namespace name to restrict the informer cache to a single namespace.
+watchNamespace: ""
+
+# --- Runtime flags ---
+# Default refresh interval applied when a FerrFlowSecret omits `spec.refreshInterval`.
+defaultRefreshInterval: 1h
+# Log level for the operator's zap logger (debug, info, warn, error).
+logLevel: info
+# Extra command-line flags appended to the manager binary.
+extraArgs: []
+
+# --- Metrics & probes ---
+metrics:
+  enabled: true
+  port: 8080
+  # ServiceMonitor for Prometheus Operator. Requires the CRD to be installed.
+  serviceMonitor:
+    enabled: false
+    # Override to scrape the operator on a non-default Prometheus instance.
+    labels: {}
+    interval: 30s
+    scrapeTimeout: 10s
+probe:
+  port: 8081
+
+# --- Service Account & RBAC ---
+serviceAccount:
+  create: true
+  # When empty, the chart derives a name from the release. Override to reuse
+  # an existing ServiceAccount (set `create: false` as well).
+  name: ""
+  annotations: {}
+
+rbac:
+  # When false, the chart skips creating ClusterRole + ClusterRoleBinding.
+  # Useful when the cluster has RBAC managed externally (e.g. kube-rbac-proxy,
+  # cluster-wide policy controller).
+  create: true
+
+# --- CRDs ---
+crds:
+  # When true (default), the chart installs the CRDs as part of the release.
+  # When false, the user is expected to install CRDs separately (e.g.
+  # `kubectl apply -f charts/ferrflow-operator/crds/`). Turning off is useful
+  # in multi-tenant clusters where CRDs are managed by a dedicated operator.
+  install: true
+  # With `keep: true`, uninstalling the chart does NOT delete the CRDs,
+  # preserving the user's CRs (and any Secrets they manage) intact. Strongly
+  # recommended — deleting CRDs cascades to CRs and their owned resources.
+  keep: true
+
+# --- Pod-level overrides ---
+resources:
+  limits:
+    cpu: 500m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
+  readOnlyRootFilesystem: true
+
+podAnnotations: {}
+podLabels: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# --- Extras ---
+# Additional environment variables exposed to the manager container.
+extraEnv: []
+# Example:
+#   - name: HTTP_PROXY
+#     value: http://proxy.example.com:3128
