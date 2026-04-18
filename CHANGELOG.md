@@ -4,6 +4,12 @@ All notable changes to `ferrflow-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [0.2.4] - 2026-04-18
+
+### Bug Fixes
+
+- fix(ci): skip Publish on rolling major tag and quote chart version (#26)
+
 ## [0.2.3] - 2026-04-18
 
 ### Bug Fixes
