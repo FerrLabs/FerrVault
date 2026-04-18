@@ -4,6 +4,12 @@ All notable changes to `ferrflow-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [0.5.0] - 2026-04-18
+
+### Features
+
+- feat(operator): FerrFlowConnection reconciler with health probe (#31)
+
 ## [0.4.0] - 2026-04-18
 
 ### Features
