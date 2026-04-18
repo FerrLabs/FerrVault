@@ -63,13 +63,25 @@ type VaultSummary struct {
 	Environment string `json:"environment"`
 }
 
+// IsClusterIdentity reports whether the configured token is a cluster
+// identity (`ffclust_...`) rather than a user API token (`fft_...`). The
+// FerrFlow API's reveal endpoint enforces namespace-scoped authorization when
+// the caller authenticates with a cluster identity, and requires the
+// `X-FerrFlow-Namespace` header on every request.
+func (c *Client) IsClusterIdentity() bool {
+	return strings.HasPrefix(c.token, "ffclust_")
+}
+
 // BulkReveal returns the requested secrets from the named vault. When `names`
-// is empty the server returns every secret in the vault. Returned `Missing`
-// lists the requested keys that weren't present — `Ready=False` worthy on the
+// is empty the server returns every secret in the vault. `namespace` is the
+// Kubernetes namespace the request is made from — sent as
+// `X-FerrFlow-Namespace` on every call. The API **requires** this header when
+// the token is a cluster identity and ignores it otherwise. Returned `Missing`
+// lists requested keys that weren't present — `Ready=False` worthy on the
 // caller's CR.
 func (c *Client) BulkReveal(
 	ctx context.Context,
-	org, project, vaultName string,
+	org, project, vaultName, namespace string,
 	names []string,
 ) (*BulkRevealResponse, error) {
 	path := fmt.Sprintf(
@@ -92,6 +104,12 @@ func (c *Client) BulkReveal(
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
+	// Namespace header: ignored by the API for user tokens, strictly required
+	// for cluster identities. Always send it so operators can switch token
+	// types by just swapping the Secret, no operator config change.
+	if namespace != "" {
+		req.Header.Set("X-FerrFlow-Namespace", namespace)
+	}
 
 	resp, err := c.http.Do(req)
 	if err != nil {

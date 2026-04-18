@@ -74,7 +74,18 @@ func (r *FerrFlowSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	// --- 3. Fetch the secrets from FerrFlow.
-	reveal, err := ffc.BulkReveal(ctx, conn.Spec.Organization, cr.Spec.Project, cr.Spec.Vault, cr.Spec.Selector.Names)
+	//
+	// The CR's own namespace is what the FerrFlow API uses to authorize
+	// cluster-identity callers (via `cluster_authorizations.namespace_name`).
+	// User-token callers ignore the header — safe to always send it.
+	reveal, err := ffc.BulkReveal(
+		ctx,
+		conn.Spec.Organization,
+		cr.Spec.Project,
+		cr.Spec.Vault,
+		cr.Namespace,
+		cr.Spec.Selector.Names,
+	)
 	if err != nil {
 		// 401/403 are terminal until the user fixes their token — longer backoff.
 		if ferrflow.IsAuthError(err) {
