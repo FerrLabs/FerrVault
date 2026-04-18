@@ -62,11 +62,23 @@ type FerrFlowSecretReconciler struct {
 func (r *FerrFlowSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithValues("ferrflowsecret", req.NamespacedName)
 
+	// Metrics: the result label starts as "failure" and gets flipped to
+	// "success" only on the happy-path return. Every early return (including
+	// failReady*) therefore records a failure observation automatically.
+	begin := time.Now()
+	result := "failure"
+	defer func() {
+		ObserveReconcile(begin, result)
+	}()
+
 	// --- 1. Load the CR.
 	var cr ffv1alpha1.FerrFlowSecret
 	if err := r.Get(ctx, req.NamespacedName, &cr); err != nil {
 		if apierrors.IsNotFound(err) {
 			// Deleted — owner references on the generated Secret will GC it.
+			// Drop the per-CR gauge so label cardinality doesn't grow forever.
+			DeleteLastSyncTimestamp(req.Namespace, req.Name)
+			result = "success"
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("load FerrFlowSecret: %w", err)
@@ -177,6 +189,16 @@ func (r *FerrFlowSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	if err := r.Status().Update(ctx, &cr); err != nil {
 		return ctrl.Result{}, fmt.Errorf("update status: %w", err)
+	}
+
+	// MissingKeys leaves the CR in Ready=False but the sync itself completed,
+	// so count it as a failure with that reason. Everything else is a clean
+	// success — stamp the timestamp gauge and flip the result label.
+	if len(reveal.Missing) > 0 {
+		IncSyncError("MissingKeys")
+	} else {
+		SetLastSyncTimestamp(cr.Namespace, cr.Name)
+		result = "success"
 	}
 
 	return ctrl.Result{RequeueAfter: r.refreshInterval(&cr)}, nil
@@ -369,6 +391,9 @@ func (r *FerrFlowSecretReconciler) failReadyWithRequeue(
 	reason, message string,
 	after time.Duration,
 ) (ctrl.Result, error) {
+	// Single choke-point for failure metrics — every caller funnels through
+	// here, so the counter stays in lockstep with the condition reason.
+	IncSyncError(reason)
 	setCondition(&cr.Status.Conditions, metav1.Condition{
 		Type:    "Ready",
 		Status:  metav1.ConditionFalse,
