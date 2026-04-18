@@ -3,17 +3,14 @@ FROM docker.io/library/golang:1.23-bookworm AS builder
 
 WORKDIR /workspace
 
-# Source first — `go mod tidy` below needs to see the imports to resolve
-# transitive deps. Layer caching isn't as tight as a separate `go mod
-# download` step, but we don't yet commit `go.sum`, so download would fail
-# (Go 1.21+ requires checksums). Once `go.sum` is committed this block can
-# move back to the classic deps-first layout.
-COPY go.mod go.sum* ./
+# Deps first for tight layer caching: this layer only invalidates when go.mod
+# or go.sum change, not on every source edit.
+COPY go.mod go.sum ./
+RUN go mod download
+
 COPY cmd/ cmd/
 COPY api/ api/
 COPY internal/ internal/
-
-RUN go mod tidy
 
 # CGO_ENABLED=0 produces a static binary we can put on distroless below.
 # TARGETOS / TARGETARCH are set automatically by buildx for multi-arch builds;
