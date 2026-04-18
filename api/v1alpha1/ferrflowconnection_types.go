@@ -25,9 +25,20 @@ type FerrFlowConnectionSpec struct {
 	// +kubebuilder:validation:MinLength=1
 	Organization string `json:"organization"`
 
-	// TokenSecretRef points at a Kubernetes Secret holding a FerrFlow API
-	// token of the form `fft_<prefix>_<secret>`. The token must carry at
-	// minimum the `secrets:read` scope.
+	// TokenSecretRef points at a Kubernetes Secret holding a FerrFlow
+	// authentication token. Two formats are supported:
+	//
+	//   * `ffclust_<prefix>_<secret>` — **recommended**. A cluster identity
+	//     created in the FerrFlow UI (`Clusters` page). Authorization is
+	//     enforced per-(namespace, project, vault) so the blast radius stays
+	//     within what you explicitly granted. The operator sends the CR's
+	//     namespace as `X-FerrFlow-Namespace` on every reveal call, and the
+	//     API checks it against `cluster_authorizations` rows.
+	//
+	//   * `fft_<prefix>_<secret>` — a user API token with `secrets:read`
+	//     scope. Supported for back-compat but discouraged: blast radius is
+	//     the whole org, no namespace scoping. Prefer cluster identities for
+	//     anything beyond a quick local test.
 	//
 	// +kubebuilder:validation:Required
 	TokenSecretRef SecretKeyRef `json:"tokenSecretRef"`
