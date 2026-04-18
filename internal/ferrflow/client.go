@@ -10,11 +10,43 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 )
+
+// RetryPolicy controls the bounded retry loop applied to every HTTP call the
+// client makes. Retries cover `TransportError` and HTTP 5xx responses only —
+// 4xx is returned immediately because those are caller-fixable (bad token,
+// wrong vault name, etc.) and retrying them just wastes request budget.
+//
+// The `Backoff` slice encodes the delay *before* each retry attempt, so
+// `Backoff[0]` is waited before attempt #2, `Backoff[1]` before attempt #3,
+// and so on. With `MaxAttempts: 3` only the first two entries are ever used,
+// but the full schedule stays defined so raising the attempt cap later is a
+// one-line change.
+type RetryPolicy struct {
+	MaxAttempts int
+	Backoff     []time.Duration
+	// Jitter is the fractional ± range applied to each backoff delay. 0.25
+	// picks a multiplier uniformly in [0.75, 1.25]. Zero disables jitter.
+	Jitter float64
+	// rand is test-only; nil falls back to a package-level source. Kept
+	// unexported so it doesn't leak into the public surface.
+	rand *rand.Rand
+}
+
+// DefaultRetryPolicy is the policy applied when callers don't override it:
+// up to three attempts with 100ms / 400ms / 1.6s delays and ±25% jitter.
+func DefaultRetryPolicy() RetryPolicy {
+	return RetryPolicy{
+		MaxAttempts: 3,
+		Backoff:     []time.Duration{100 * time.Millisecond, 400 * time.Millisecond, 1600 * time.Millisecond},
+		Jitter:      0.25,
+	}
+}
 
 // Client is a narrow FerrFlow HTTP client.
 //
@@ -23,12 +55,23 @@ type Client struct {
 	baseURL *url.URL
 	token   string
 	http    *http.Client
+	retry   RetryPolicy
+}
+
+// Option configures a Client at construction time.
+type Option func(*Client)
+
+// WithRetry overrides the retry policy. Pass `RetryPolicy{MaxAttempts: 1}` to
+// disable retries entirely — useful in tests that want to assert a single
+// request was made.
+func WithRetry(p RetryPolicy) Option {
+	return func(c *Client) { c.retry = p }
 }
 
 // New constructs a client targeting `baseURL` with the given bearer token.
 // `baseURL` is the API root — e.g. `https://ferrflow.example.com`. The client
 // adds `/api/v1/...` paths itself.
-func New(baseURL, token string) (*Client, error) {
+func New(baseURL, token string, opts ...Option) (*Client, error) {
 	if token == "" {
 		return nil, errors.New("ferrflow: empty API token")
 	}
@@ -39,13 +82,18 @@ func New(baseURL, token string) (*Client, error) {
 	if u.Scheme != "http" && u.Scheme != "https" {
 		return nil, fmt.Errorf("ferrflow: base URL must use http(s), got %q", baseURL)
 	}
-	return &Client{
+	c := &Client{
 		baseURL: u,
 		token:   token,
 		http: &http.Client{
 			Timeout: 10 * time.Second,
 		},
-	}, nil
+		retry: DefaultRetryPolicy(),
+	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c, nil
 }
 
 // Probe is a lightweight reachability check against the FerrFlow API.
@@ -59,23 +107,24 @@ func New(baseURL, token string) (*Client, error) {
 func (c *Client) Probe(ctx context.Context) error {
 	u := *c.baseURL
 	u.Path = strings.TrimRight(u.Path, "/") + "/health"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-	if err != nil {
-		return fmt.Errorf("ferrflow: build probe request: %w", err)
-	}
-	req.Header.Set("Accept", "application/json")
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return &TransportError{Underlying: err}
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
+
+	_, err := c.doWithRetry(ctx, func() (*http.Response, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+		if err != nil {
+			return nil, fmt.Errorf("ferrflow: build probe request: %w", err)
+		}
+		req.Header.Set("Accept", "application/json")
+		return c.http.Do(req)
+	}, func(resp *http.Response, body []byte) error {
+		if resp.StatusCode == http.StatusOK {
+			return nil
+		}
 		return &APIError{
 			Status:  resp.StatusCode,
 			Message: fmt.Sprintf("health check returned %s", http.StatusText(resp.StatusCode)),
 		}
-	}
-	return nil
+	})
+	return err
 }
 
 // BulkRevealResponse is the decoded shape of
@@ -128,48 +177,165 @@ func (c *Client) BulkReveal(
 		u.RawQuery = q.Encode()
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-	if err != nil {
-		return nil, fmt.Errorf("ferrflow: build request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("Accept", "application/json")
-	// Namespace header: ignored by the API for user tokens, strictly required
-	// for cluster identities. Always send it so operators can switch token
-	// types by just swapping the Secret, no operator config change.
-	if namespace != "" {
-		req.Header.Set("X-FerrFlow-Namespace", namespace)
-	}
-
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, &TransportError{Underlying: err}
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, readErr := io.ReadAll(resp.Body)
-	if readErr != nil {
-		return nil, &TransportError{Underlying: readErr}
-	}
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-		var out BulkRevealResponse
-		if err := json.Unmarshal(body, &out); err != nil {
-			return nil, fmt.Errorf("ferrflow: decode response: %w", err)
+	var out BulkRevealResponse
+	_, err := c.doWithRetry(ctx, func() (*http.Response, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+		if err != nil {
+			return nil, fmt.Errorf("ferrflow: build request: %w", err)
 		}
-		return &out, nil
-	case http.StatusUnauthorized:
-		return nil, &AuthError{Kind: AuthUnauthorized, Message: errorMessage(body, "unauthorized")}
-	case http.StatusForbidden:
-		return nil, &AuthError{Kind: AuthForbidden, Message: errorMessage(body, "forbidden")}
-	case http.StatusNotFound:
-		return nil, &NotFoundError{Message: errorMessage(body, "not found")}
-	default:
-		return nil, &APIError{
-			Status:  resp.StatusCode,
-			Message: errorMessage(body, http.StatusText(resp.StatusCode)),
+		req.Header.Set("Authorization", "Bearer "+c.token)
+		req.Header.Set("Accept", "application/json")
+		// Namespace header: ignored by the API for user tokens, strictly
+		// required for cluster identities. Always send it so operators can
+		// switch token types by just swapping the Secret, no operator
+		// config change.
+		if namespace != "" {
+			req.Header.Set("X-FerrFlow-Namespace", namespace)
 		}
+		return c.http.Do(req)
+	}, func(resp *http.Response, body []byte) error {
+		switch resp.StatusCode {
+		case http.StatusOK:
+			if err := json.Unmarshal(body, &out); err != nil {
+				return fmt.Errorf("ferrflow: decode response: %w", err)
+			}
+			return nil
+		case http.StatusUnauthorized:
+			return &AuthError{Kind: AuthUnauthorized, Message: errorMessage(body, "unauthorized")}
+		case http.StatusForbidden:
+			return &AuthError{Kind: AuthForbidden, Message: errorMessage(body, "forbidden")}
+		case http.StatusNotFound:
+			return &NotFoundError{Message: errorMessage(body, "not found")}
+		default:
+			return &APIError{
+				Status:  resp.StatusCode,
+				Message: errorMessage(body, http.StatusText(resp.StatusCode)),
+			}
+		}
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// doWithRetry runs `send` under the configured retry policy, handing the raw
+// response and body to `classify`. `classify` returns nil on success, or a
+// typed error; 5xx `APIError`s and `TransportError`s are treated as retriable,
+// everything else is returned immediately.
+//
+// The resulting error carries the total attempt count (1-based) via the
+// `Attempts` field on `TransportError` / `APIError`, so callers can log
+// "succeeded after N retries" / "failed after N retries" without having to
+// instrument the request site themselves.
+func (c *Client) doWithRetry(
+	ctx context.Context,
+	send func() (*http.Response, error),
+	classify func(resp *http.Response, body []byte) error,
+) (int, error) {
+	maxAttempts := c.retry.MaxAttempts
+	if maxAttempts < 1 {
+		maxAttempts = 1
+	}
+
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return attempt, err
+		}
+
+		resp, sendErr := send()
+		var attemptErr error
+		if sendErr != nil {
+			attemptErr = &TransportError{Underlying: sendErr}
+		} else {
+			body, readErr := io.ReadAll(resp.Body)
+			_ = resp.Body.Close()
+			if readErr != nil {
+				attemptErr = &TransportError{Underlying: readErr}
+			} else {
+				attemptErr = classify(resp, body)
+			}
+		}
+
+		if attemptErr == nil {
+			return attempt, nil
+		}
+
+		lastErr = attemptErr
+		if !isRetriable(attemptErr) || attempt == maxAttempts {
+			annotateAttempts(lastErr, attempt)
+			return attempt, lastErr
+		}
+
+		delay := c.backoffFor(attempt)
+		if delay <= 0 {
+			continue
+		}
+		timer := time.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return attempt, ctx.Err()
+		case <-timer.C:
+		}
+	}
+	annotateAttempts(lastErr, maxAttempts)
+	return maxAttempts, lastErr
+}
+
+// backoffFor returns the jittered delay to wait *before* the next attempt.
+// `attempt` is the number of the attempt that just failed (1-based), so the
+// next wait is `Backoff[attempt-1]`. Attempts past the end of the schedule
+// reuse the final entry, which keeps "raise MaxAttempts without touching
+// Backoff" predictable.
+func (c *Client) backoffFor(attempt int) time.Duration {
+	if len(c.retry.Backoff) == 0 {
+		return 0
+	}
+	idx := attempt - 1
+	if idx >= len(c.retry.Backoff) {
+		idx = len(c.retry.Backoff) - 1
+	}
+	base := c.retry.Backoff[idx]
+	if c.retry.Jitter <= 0 {
+		return base
+	}
+	var f float64
+	if c.retry.rand != nil {
+		f = c.retry.rand.Float64()
+	} else {
+		f = rand.Float64()
+	}
+	// Multiplier in [1-jitter, 1+jitter].
+	mult := 1 - c.retry.Jitter + 2*c.retry.Jitter*f
+	return time.Duration(float64(base) * mult)
+}
+
+// isRetriable returns true for transport failures and 5xx API errors.
+func isRetriable(err error) bool {
+	var te *TransportError
+	if errors.As(err, &te) {
+		return true
+	}
+	var ae *APIError
+	if errors.As(err, &ae) {
+		return ae.Status >= 500 && ae.Status <= 599
+	}
+	return false
+}
+
+// annotateAttempts stamps the attempt count onto typed errors that expose an
+// `Attempts` field. Called once at the end of `doWithRetry` so the number the
+// caller sees is the total tries made, not just the last one.
+func annotateAttempts(err error, attempts int) {
+	var te *TransportError
+	if errors.As(err, &te) {
+		te.Attempts = attempts
+	}
+	var ae *APIError
+	if errors.As(err, &ae) {
+		ae.Attempts = attempts
 	}
 }
 
@@ -186,9 +352,12 @@ func errorMessage(body []byte, fallback string) string {
 }
 
 // TransportError wraps network-level failures (DNS, TCP, TLS, timeouts).
-// The reconciler should retry these with backoff.
+// The client retries these with backoff; `Attempts` records how many tries
+// were spent before giving up (or, on success, how many the caller made
+// before seeing the error — always ≥ 1).
 type TransportError struct {
 	Underlying error
+	Attempts   int
 }
 
 func (e *TransportError) Error() string {
@@ -240,10 +409,12 @@ func IsNotFound(err error) bool {
 	return errors.As(err, &n)
 }
 
-// APIError covers any remaining non-2xx status.
+// APIError covers any remaining non-2xx status. For 5xx responses it also
+// records the total number of attempts made before the client gave up.
 type APIError struct {
-	Status  int
-	Message string
+	Status   int
+	Message  string
+	Attempts int
 }
 
 func (e *APIError) Error() string {
