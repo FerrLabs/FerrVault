@@ -76,15 +76,22 @@ make install-crds   # CRDs only
 make run            # runs the manager as your user, not as a Pod
 ```
 
-### Raw manifests (without Helm)
+### Raw manifests (without Helm at runtime)
+
+The Helm chart is the single source of truth for all manifests (CRDs, RBAC,
+ServiceAccount, Deployment). If your cluster policy forbids running Helm at
+deploy time, render once and commit/apply the plain YAML:
 
 ```bash
-kubectl apply -f config/crd/bases/
 kubectl create namespace ferrflow-operator-system
-kubectl apply -f config/rbac/
-# You still need a Deployment — render one from the chart:
-#   helm template ferrflow-operator charts/ferrflow-operator > manager.yaml
+helm template ferrflow-operator charts/ferrflow-operator \
+  --namespace ferrflow-operator-system \
+  > manager.yaml
+kubectl apply -f manager.yaml
 ```
+
+No duplicate `config/rbac/` or `config/crd/` lives in the repo — anything
+rendered from the chart *is* the canonical version.
 
 ## Prerequisites in FerrFlow
 

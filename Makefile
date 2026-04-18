@@ -16,9 +16,8 @@ help:
 	@echo "  test             Run unit tests."
 	@echo "  build            Build the manager binary into bin/manager."
 	@echo "  docker-build     Build the container image as \$$IMG (default: $(IMG))."
-	@echo "  install-crds     Apply CRDs to the current kubectl context."
+	@echo "  install-crds     Apply CRDs (rendered from the Helm chart) to the current context."
 	@echo "  uninstall-crds   Remove CRDs from the current kubectl context."
-	@echo "  deploy-rbac      Apply the operator ServiceAccount, Role, Binding."
 	@echo "  run              Run the manager against the current kubectl context."
 	@echo "  helm-lint        Run 'helm lint' on charts/ferrflow-operator."
 	@echo "  helm-template    Render the chart and print to stdout (sanity check)."
@@ -46,17 +45,17 @@ build:
 docker-build:
 	docker build -t $(IMG) .
 
+# CRDs are owned by the Helm chart (the only source of truth). For a
+# `make run`-style local dev loop we still need them applied — render them
+# from the chart and pipe into kubectl instead of maintaining a duplicate set
+# under config/.
 .PHONY: install-crds
 install-crds:
-	kubectl apply -f config/crd/bases/
+	helm template ferrflow-operator $(CHART_DIR) --show-only templates/crd-*.yaml | kubectl apply -f -
 
 .PHONY: uninstall-crds
 uninstall-crds:
-	kubectl delete --ignore-not-found -f config/crd/bases/
-
-.PHONY: deploy-rbac
-deploy-rbac:
-	kubectl apply -f config/rbac/
+	helm template ferrflow-operator $(CHART_DIR) --show-only templates/crd-*.yaml | kubectl delete --ignore-not-found -f -
 
 .PHONY: run
 run: build
