@@ -6,7 +6,7 @@ type: application
 # `version` is the chart's own version (bumped on chart-only changes).
 # `appVersion` mirrors the operator binary version — both are kept in sync
 # automatically by FerrFlow on every release of this repo.
-version: 0.1.0
+version: "0.1.0"
 appVersion: "0.1.0"
 
 kubeVersion: ">=1.28.0-0"

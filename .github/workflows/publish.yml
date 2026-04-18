@@ -22,6 +22,13 @@ jobs:
   resolve:
     name: Resolve version
     runs-on: ubuntu-latest
+    # Skip the rolling major-only tag (e.g. `v0`, `v1`): it points at the
+    # latest patch of that major, which already triggered this workflow under
+    # its exact tag (`v0.2.3`). Re-running here would try to re-publish a
+    # chart version of just `0`, which YAML parses as an integer and helm
+    # lint rejects. The Docker job's own `v${major}` and `latest` tags are
+    # handled by the exact-version run.
+    if: github.event_name == 'workflow_dispatch' || !(startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '.'))
     outputs:
       version: ${{ steps.v.outputs.version }}
       major: ${{ steps.v.outputs.major }}
@@ -85,7 +92,10 @@ jobs:
           V="${{ needs.resolve.outputs.version }}"
           # `version` = chart version, `appVersion` = operator version.
           # We keep them in lock-step — one release cuts both.
-          sed -i -E "s/^version: .*/version: $V/" charts/ferrflow-operator/Chart.yaml
+          # Quote both fields — helm lint rejects `version: 0` / `version: 1.0`
+          # because unquoted they parse as int/float and the schema requires a
+          # string.
+          sed -i -E "s/^version: .*/version: \"$V\"/" charts/ferrflow-operator/Chart.yaml
           sed -i -E "s/^appVersion: .*/appVersion: \"$V\"/" charts/ferrflow-operator/Chart.yaml
           echo "--- Chart.yaml head ---"
           head -n 15 charts/ferrflow-operator/Chart.yaml
