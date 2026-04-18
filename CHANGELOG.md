@@ -4,6 +4,12 @@ All notable changes to `ferrflow-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [0.6.0] - 2026-04-18
+
+### Features
+
+- feat(client): bounded retry with exponential backoff and jitter (#33)
+
 ## [0.5.0] - 2026-04-18
 
 ### Features
