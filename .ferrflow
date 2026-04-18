@@ -2,8 +2,7 @@
   "$schema": "https://ferrflow.com/schema/ferrflow.json",
   "workspace": {
     "recoverMissedReleases": true,
-    "skipCi": false,
-    "floatingTags": ["major"]
+    "skipCi": false
   },
   "package": [
     {
