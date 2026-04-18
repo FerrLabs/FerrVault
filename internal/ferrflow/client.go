@@ -48,6 +48,36 @@ func New(baseURL, token string) (*Client, error) {
 	}, nil
 }
 
+// Probe is a lightweight reachability check against the FerrFlow API.
+// Calls `GET <baseURL>/health` (public, unauthenticated) and succeeds when
+// the response is 200 with a JSON body containing `{"status":"ok"}`.
+//
+// Deliberately does not exercise the token — auth correctness is reported
+// per-vault by the `FerrFlowSecret` reconciler, where the org/project/vault
+// context is known. Probe answers the narrower question "can the operator
+// reach this API instance at all?".
+func (c *Client) Probe(ctx context.Context) error {
+	u := *c.baseURL
+	u.Path = strings.TrimRight(u.Path, "/") + "/health"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return fmt.Errorf("ferrflow: build probe request: %w", err)
+	}
+	req.Header.Set("Accept", "application/json")
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return &TransportError{Underlying: err}
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return &APIError{
+			Status:  resp.StatusCode,
+			Message: fmt.Sprintf("health check returned %s", http.StatusText(resp.StatusCode)),
+		}
+	}
+	return nil
+}
+
 // BulkRevealResponse is the decoded shape of
 // `GET /orgs/:org/projects/:proj/vaults/by-name/:vault/secrets/reveal`.
 type BulkRevealResponse struct {
