@@ -47,6 +47,11 @@ type FerrFlowSecretReconciler struct {
 	// DefaultRefreshInterval is used when the spec leaves `refreshInterval`
 	// blank or set to an unparseable value. Set by cmd/main.go at startup.
 	DefaultRefreshInterval time.Duration
+
+	// ClientFactory builds the FerrFlow HTTP client. Left nil in production —
+	// the reconciler falls back to defaultClientFactory, which hands back a
+	// real *ferrflow.Client. Unit tests inject a fake here.
+	ClientFactory ClientFactory
 }
 
 // +kubebuilder:rbac:groups=ferrflow.io,resources=ferrflowsecrets,verbs=get;list;watch;create;update;patch;delete
@@ -97,7 +102,11 @@ func (r *FerrFlowSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return r.failReady(ctx, &cr, "TokenUnreadable", err.Error())
 	}
 
-	ffc, err := ferrflow.New(conn.Spec.URL, token)
+	factory := r.ClientFactory
+	if factory == nil {
+		factory = defaultClientFactory
+	}
+	ffc, err := factory(conn.Spec.URL, token)
 	if err != nil {
 		return r.failReady(ctx, &cr, "InvalidConnection", err.Error())
 	}
