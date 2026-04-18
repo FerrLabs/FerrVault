@@ -80,9 +80,9 @@ func (r *FerrFlowConnectionReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 // probe returns `(status, reason, message)` describing the Ready condition
 // to stamp on the CR. Ordered checks, first failure wins:
-//   1. Token Secret must be readable.
-//   2. Base URL must parse.
-//   3. Health endpoint must answer 200.
+//  1. Token Secret must be readable.
+//  2. Base URL must parse.
+//  3. Health endpoint must answer 200.
 func (r *FerrFlowConnectionReconciler) probe(
 	ctx context.Context,
 	conn *ffv1alpha1.FerrFlowConnection,
