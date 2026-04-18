@@ -56,6 +56,8 @@ func (r *FerrFlowConnectionReconciler) Reconcile(ctx context.Context, req ctrl.R
 	var conn ffv1alpha1.FerrFlowConnection
 	if err := r.Get(ctx, req.NamespacedName, &conn); err != nil {
 		if apierrors.IsNotFound(err) {
+			// Drop the gauge series so deleted connections don't linger.
+			DeleteConnectionReady(req.Namespace, req.Name)
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("load FerrFlowConnection: %w", err)
@@ -75,6 +77,7 @@ func (r *FerrFlowConnectionReconciler) Reconcile(ctx context.Context, req ctrl.R
 	if err := r.Status().Update(ctx, &conn); err != nil {
 		return ctrl.Result{}, fmt.Errorf("update status: %w", err)
 	}
+	SetConnectionReady(conn.Namespace, conn.Name, status == metav1.ConditionTrue)
 	return ctrl.Result{RequeueAfter: connectionProbeInterval}, nil
 }
 
