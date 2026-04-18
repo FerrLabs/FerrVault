@@ -57,9 +57,9 @@ jobs:
         with:
           version: v3.16.4
 
-      - name: Resolve dependencies
+      - name: Download dependencies
         if: steps.gate.outputs.has_go == 'true'
-        run: go mod tidy
+        run: go mod download
 
       - name: Build operator image into the kind node
         if: steps.gate.outputs.has_go == 'true'
