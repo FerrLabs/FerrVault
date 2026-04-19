@@ -1,0 +1,35 @@
+# Snippet for the operator Deployment when using OIDC workload identity.
+# Merge into the existing `config/manager/manager.yaml` (or the chart) —
+# only the volume + volumeMount are strictly required; the rest is here
+# for context.
+#
+# The audience MUST match what FerrFlow expects (`https://ferrflow.com` by
+# default). If you override it in `FerrFlowConnection.spec.oidc.audience`,
+# keep both sides in sync.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ferrflow-operator
+  namespace: ferrflow-system
+spec:
+  template:
+    spec:
+      serviceAccountName: ferrflow-operator
+      containers:
+        - name: manager
+          image: ghcr.io/ferrflow-org/ferrflow-operator:latest
+          volumeMounts:
+            - name: ferrflow-token
+              mountPath: /var/run/secrets/ferrflow
+              readOnly: true
+      volumes:
+        - name: ferrflow-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  audience: https://ferrflow.com
+                  # 1h is fine — kubelet re-mints before expiry. The
+                  # operator re-reads this file on every OIDC cache miss
+                  # (~15 min) so it always sees the latest token.
+                  expirationSeconds: 3600

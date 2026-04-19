@@ -101,7 +101,7 @@ func baseConn() *ffv1alpha1.FerrFlowConnection {
 		Spec: ffv1alpha1.FerrFlowConnectionSpec{
 			URL:          "https://ferrflow.example.com",
 			Organization: testOrg,
-			TokenSecretRef: ffv1alpha1.SecretKeyRef{
+			TokenSecretRef: &ffv1alpha1.SecretKeyRef{
 				Name: testTokenSecret,
 				Key:  testTokenKey,
 			},

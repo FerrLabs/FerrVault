@@ -37,10 +37,14 @@ const connectionProbeInterval = 10 * time.Minute
 
 // FerrFlowConnectionReconciler reports whether a FerrFlowConnection's
 // configured FerrFlow API instance is reachable and whether the referenced
-// token Secret is readable.
+// token source (Secret or OIDC exchange) is usable.
 type FerrFlowConnectionReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	// Broker resolves the bearer for the connection's configured auth
+	// mode. Shared with the FerrFlowSecret reconciler so the OIDC cache
+	// isn't split. Defaults to a fresh broker if nil.
+	Broker *TokenBroker
 }
 
 // +kubebuilder:rbac:groups=ferrflow.io,resources=ferrflowconnections,verbs=get;list;watch
@@ -90,7 +94,11 @@ func (r *FerrFlowConnectionReconciler) probe(
 	ctx context.Context,
 	conn *ffv1alpha1.FerrFlowConnection,
 ) (metav1.ConditionStatus, string, string) {
-	token, err := r.loadTokenForConnection(ctx, conn)
+	broker := r.Broker
+	if broker == nil {
+		broker = NewTokenBroker(r.Client)
+	}
+	token, err := broker.TokenFor(ctx, conn)
 	if err != nil {
 		return metav1.ConditionFalse, "TokenUnreadable", err.Error()
 	}
@@ -109,33 +117,9 @@ func (r *FerrFlowConnectionReconciler) probe(
 	return metav1.ConditionTrue, "Reachable", fmt.Sprintf("%s responded to /health", conn.Spec.URL)
 }
 
-// loadTokenForConnection resolves the token Secret the connection points at.
-// Duplicates FerrFlowSecretReconciler.loadToken intentionally — the
-// signatures diverged enough that sharing via a common helper would add more
-// noise than it removes.
-func (r *FerrFlowConnectionReconciler) loadTokenForConnection(
-	ctx context.Context,
-	conn *ffv1alpha1.FerrFlowConnection,
-) (string, error) {
-	var tokenSecret corev1.Secret
-	key := types.NamespacedName{
-		Namespace: conn.Namespace,
-		Name:      conn.Spec.TokenSecretRef.Name,
-	}
-	if err := r.Get(ctx, key, &tokenSecret); err != nil {
-		return "", fmt.Errorf("load token Secret %s: %w", key, err)
-	}
-	raw, ok := tokenSecret.Data[conn.Spec.TokenSecretRef.Key]
-	if !ok {
-		return "", fmt.Errorf("key %q missing from token Secret %s",
-			conn.Spec.TokenSecretRef.Key, key)
-	}
-	if len(raw) == 0 {
-		return "", fmt.Errorf("token Secret %s has empty value at key %q",
-			key, conn.Spec.TokenSecretRef.Key)
-	}
-	return string(raw), nil
-}
+// Legacy note: the old `loadTokenForConnection` helper lived here. It was
+// folded into the `TokenBroker` so both reconcilers share one resolver +
+// one OIDC cache. See `token_broker.go`.
 
 // SetupWithManager wires the reconciler and adds a watch on the referenced
 // token Secrets so updates flow through immediately. Matches the pattern
@@ -143,13 +127,18 @@ func (r *FerrFlowConnectionReconciler) loadTokenForConnection(
 // not when the ten-minute probe tick lands.
 func (r *FerrFlowConnectionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Index FerrFlowConnections by the token Secret name so we can find the
-	// affected CR(s) cheaply on a Secret update event.
+	// affected CR(s) cheaply on a Secret update event. Connections in OIDC
+	// mode have no token Secret reference and are excluded from the index —
+	// they reconcile on the Connection itself, not on a Secret watch.
 	if err := mgr.GetFieldIndexer().IndexField(
 		context.Background(),
 		&ffv1alpha1.FerrFlowConnection{},
 		".spec.tokenSecretRef.name",
 		func(obj client.Object) []string {
 			c := obj.(*ffv1alpha1.FerrFlowConnection)
+			if c.Spec.TokenSecretRef == nil {
+				return nil
+			}
 			return []string{c.Spec.TokenSecretRef.Name}
 		},
 	); err != nil {
