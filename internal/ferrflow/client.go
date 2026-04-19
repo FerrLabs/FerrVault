@@ -5,6 +5,7 @@
 package ferrflow
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -149,6 +150,74 @@ type VaultSummary struct {
 // `X-FerrFlow-Namespace` header on every request.
 func (c *Client) IsClusterIdentity() bool {
 	return strings.HasPrefix(c.token, "ffclust_")
+}
+
+// OIDCExchangeResponse is the decoded shape of `POST /clusters/oidc-exchange`.
+type OIDCExchangeResponse struct {
+	AccessToken string    `json:"access_token"`
+	ExpiresAt   time.Time `json:"expires_at"`
+	TokenType   string    `json:"token_type"`
+}
+
+// OIDCExchange posts an OIDC JWT (typically a projected ServiceAccount
+// token) to FerrFlow and returns the minted short-lived cluster bearer +
+// its expiry. The endpoint is unauthenticated — the JWT body IS the auth —
+// so the `Authorization` header on the outbound request is irrelevant and
+// we just set the dummy token the client was built with.
+//
+// Used by the token broker. The returned bearer can be fed back into a new
+// `ferrflow.New` client instance for downstream API calls.
+func (c *Client) OIDCExchange(
+	ctx context.Context,
+	clusterID, saToken string,
+) (string, time.Time, error) {
+	u := *c.baseURL
+	u.Path = strings.TrimRight(u.Path, "/") + "/api/v1/clusters/oidc-exchange"
+
+	body := struct {
+		ClusterID string `json:"cluster_id"`
+		Token     string `json:"token"`
+	}{clusterID, saToken}
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("ferrflow: encode oidc exchange request: %w", err)
+	}
+
+	var out OIDCExchangeResponse
+	_, err = c.doWithRetry(ctx, func() (*http.Response, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(),
+			bytes.NewReader(payload))
+		if err != nil {
+			return nil, fmt.Errorf("ferrflow: build request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json")
+		return c.http.Do(req)
+	}, func(resp *http.Response, body []byte) error {
+		switch resp.StatusCode {
+		case http.StatusOK:
+			if err := json.Unmarshal(body, &out); err != nil {
+				return fmt.Errorf("ferrflow: decode oidc response: %w", err)
+			}
+			return nil
+		case http.StatusUnauthorized:
+			return &AuthError{Kind: AuthUnauthorized, Message: errorMessage(body, "unauthorized")}
+		case http.StatusBadRequest:
+			return &APIError{
+				Status:  resp.StatusCode,
+				Message: errorMessage(body, "bad request"),
+			}
+		default:
+			return &APIError{
+				Status:  resp.StatusCode,
+				Message: errorMessage(body, http.StatusText(resp.StatusCode)),
+			}
+		}
+	})
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	return out.AccessToken, out.ExpiresAt, nil
 }
 
 // BulkReveal returns the requested secrets from the named vault. When `names`

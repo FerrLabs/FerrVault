@@ -9,6 +9,10 @@ import (
 // which organization the operator should scope its reads to. A single
 // `FerrFlowConnection` object is typically shared by multiple `FerrFlowSecret`
 // objects in the same namespace — users create one per (cluster, org) pair.
+//
+// Exactly one authentication source must be set: either `tokenSecretRef`
+// (long-lived token stored in a k8s Secret) or `oidc` (workload-identity
+// exchange — recommended, no long-lived secret at rest).
 type FerrFlowConnectionSpec struct {
 	// URL is the base of the FerrFlow API — e.g. `https://ferrflow.example.com`.
 	// The operator appends `/api/v1/…` paths itself.
@@ -26,23 +30,67 @@ type FerrFlowConnectionSpec struct {
 	Organization string `json:"organization"`
 
 	// TokenSecretRef points at a Kubernetes Secret holding a FerrFlow
-	// authentication token. Two formats are supported:
+	// authentication token — `ffclust_...` (cluster identity) or `fft_...`
+	// (user API token, org-scoped, discouraged).
 	//
-	//   * `ffclust_<prefix>_<secret>` — **recommended**. A cluster identity
-	//     created in the FerrFlow UI (`Clusters` page). Authorization is
-	//     enforced per-(namespace, project, vault) so the blast radius stays
-	//     within what you explicitly granted. The operator sends the CR's
-	//     namespace as `X-FerrFlow-Namespace` on every reveal call, and the
-	//     API checks it against `cluster_authorizations` rows.
+	// Kept for **air-gapped clusters** where FerrFlow cannot reach the
+	// cluster's OIDC JWKS endpoint, and for **non-Kubernetes callers**.
+	// When FerrFlow can reach the cluster, prefer `oidc` — no secret at
+	// rest, short-lived tokens, automatic rotation.
 	//
-	//   * `fft_<prefix>_<secret>` — a user API token with `secrets:read`
-	//     scope. Supported for back-compat but discouraged: blast radius is
-	//     the whole org, no namespace scoping. Prefer cluster identities for
-	//     anything beyond a quick local test.
+	// +optional
+	TokenSecretRef *SecretKeyRef `json:"tokenSecretRef,omitempty"`
+
+	// OIDC enables workload-identity authentication: the operator presents
+	// its projected ServiceAccount token to FerrFlow, which validates it
+	// against the cluster's registered OIDC config and mints a short-lived
+	// bearer. No long-lived secret on the cluster side, revocation is
+	// instant on the FerrFlow side.
+	//
+	// Requires the FerrFlow cluster resource to be pre-configured with
+	// OIDC (`PUT /orgs/:org/clusters/:id/oidc` on the FerrFlow API), and
+	// the operator pod to have a projected SA token volume mounted at
+	// `oidc.tokenPath` with audience matching `oidc.audience`.
+	//
+	// +optional
+	OIDC *OIDCAuth `json:"oidc,omitempty"`
+}
+
+// OIDCAuth configures the workload-identity exchange. The operator posts
+// the JWT at `oidc.tokenPath` to FerrFlow's `POST /clusters/oidc-exchange`
+// and caches the returned bearer for its lifetime (currently ~15 min).
+type OIDCAuth struct {
+	// ClusterID is the UUID of the cluster resource registered in FerrFlow.
+	// Admins retrieve it from the FerrFlow UI after creating the cluster.
 	//
 	// +kubebuilder:validation:Required
-	TokenSecretRef SecretKeyRef `json:"tokenSecretRef"`
+	// +kubebuilder:validation:Pattern=`^[0-9a-fA-F-]{36}$`
+	ClusterID string `json:"clusterID"`
+
+	// TokenPath is the filesystem location where kubelet mounts the
+	// projected ServiceAccount token. Defaults to
+	// `/var/run/secrets/ferrflow/token` — match this in the operator pod's
+	// `volumeMounts` + `serviceAccountToken` projection.
+	//
+	// +optional
+	TokenPath string `json:"tokenPath,omitempty"`
+
+	// Audience the projected ServiceAccount token declares in its `aud`
+	// claim. Must match `EXPECTED_AUDIENCE` on the FerrFlow side
+	// (`https://ferrflow.com`). Defaults to that value when omitted.
+	//
+	// +optional
+	Audience string `json:"audience,omitempty"`
 }
+
+// DefaultTokenPath is where kubelet mounts the projected SA token in our
+// sample Deployment. Exposed so both the controllers and the chart share
+// a single source of truth.
+const DefaultTokenPath = "/var/run/secrets/ferrflow/token"
+
+// DefaultAudience matches the FerrFlow API's `EXPECTED_AUDIENCE` constant.
+// Changing this is a coordinated breaking change across both repos.
+const DefaultAudience = "https://ferrflow.com"
 
 // SecretKeyRef selects a single key inside a Kubernetes Secret.
 type SecretKeyRef struct {
@@ -112,8 +160,25 @@ func (in *FerrFlowConnection) DeepCopyInto(out *FerrFlowConnection) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
-	out.Spec = in.Spec
+	in.Spec.DeepCopyInto(&out.Spec)
 	in.Status.DeepCopyInto(&out.Status)
+}
+
+// DeepCopyInto for the spec — pointer fields (TokenSecretRef, OIDC) are the
+// reason we need a real deep copy here instead of the shallow `= *in`.
+// Shallow would share the inner struct between receivers of the deep copy,
+// which breaks the "caller can mutate without affecting the source"
+// invariant that the Kubernetes controller-runtime relies on.
+func (in *FerrFlowConnectionSpec) DeepCopyInto(out *FerrFlowConnectionSpec) {
+	*out = *in
+	if in.TokenSecretRef != nil {
+		out.TokenSecretRef = new(SecretKeyRef)
+		*out.TokenSecretRef = *in.TokenSecretRef
+	}
+	if in.OIDC != nil {
+		out.OIDC = new(OIDCAuth)
+		*out.OIDC = *in.OIDC
+	}
 }
 
 // DeepCopy returns a deep copy of the receiver.
