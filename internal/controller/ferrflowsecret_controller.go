@@ -18,11 +18,19 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	ffv1alpha1 "github.com/FerrFlow-Org/FerrFlow-Operator/api/v1alpha1"
 	"github.com/FerrFlow-Org/FerrFlow-Operator/internal/ferrflow"
 )
+
+// connectionRefIndexKey is the field-indexer key for
+// `ffv1alpha1.FerrFlowSecret.spec.connectionRef.name`. Defined here rather
+// than inline so the watch setup and the list call in the map func stay in
+// sync.
+const connectionRefIndexKey = ".spec.connectionRef.name"
 
 const (
 	// annotationContentHash is a digest of the synced key/value pairs, used to
@@ -439,10 +447,121 @@ func setCondition(conds *[]metav1.Condition, c metav1.Condition) {
 
 // SetupWithManager wires the reconciler into the controller manager and sets
 // up the watches it needs.
+//
+// Beyond the trivial `For` / `Owns` pair, we watch:
+//
+//   - `FerrFlowConnection` — a connection update (spec change or status flip)
+//     is effectively a cache-invalidation event for every FerrFlowSecret
+//     referencing it. Without this watch, the downstream CRs only re-reconcile
+//     on their `refreshInterval` (1h by default).
+//   - `Secret` — specifically the token Secret that a referenced Connection
+//     points at. Rotating the token otherwise takes up to `refreshInterval`
+//     to flow through, which is too long for emergency rotation.
+//
+// Both map funcs are bounded: each event triggers O(N) CR lookups where N is
+// the number of CRs in the namespace, not cluster-wide. Field indexers keep
+// those lookups cheap.
 func (r *FerrFlowSecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// Index FerrFlowSecret by the name of the Connection it references.
+	if err := mgr.GetFieldIndexer().IndexField(
+		context.Background(),
+		&ffv1alpha1.FerrFlowSecret{},
+		connectionRefIndexKey,
+		func(obj client.Object) []string {
+			s := obj.(*ffv1alpha1.FerrFlowSecret)
+			return []string{s.Spec.ConnectionRef.Name}
+		},
+	); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&ffv1alpha1.FerrFlowSecret{}).
 		Owns(&corev1.Secret{}).
+		Watches(
+			&ffv1alpha1.FerrFlowConnection{},
+			handler.EnqueueRequestsFromMapFunc(r.secretsReferencingConnection),
+		).
+		Watches(
+			&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(r.secretsReferencingTokenSecret),
+		).
 		Named("ferrflowsecret").
 		Complete(r)
+}
+
+// secretsReferencingConnection returns reconcile requests for every
+// FerrFlowSecret in the same namespace that references the given Connection
+// by name. Used to invalidate the derived Secret when the Connection spec
+// changes (URL flip, org change) or when the Connection's own Ready
+// condition flips (which the Connection reconciler writes after a token
+// Secret change, so this is one of the two paths that propagates token
+// rotations).
+func (r *FerrFlowSecretReconciler) secretsReferencingConnection(
+	ctx context.Context,
+	obj client.Object,
+) []reconcile.Request {
+	var list ffv1alpha1.FerrFlowSecretList
+	if err := r.List(ctx, &list,
+		client.InNamespace(obj.GetNamespace()),
+		client.MatchingFields{connectionRefIndexKey: obj.GetName()},
+	); err != nil {
+		return nil
+	}
+	return requestsForList(list.Items)
+}
+
+// secretsReferencingTokenSecret handles the direct-path case: a Secret is
+// updated, find every FerrFlowConnection in the namespace whose
+// `tokenSecretRef.name` matches, then enqueue each FerrFlowSecret that
+// references any of those Connections.
+//
+// This covers the case where the Connection reconciler is somehow delayed
+// (e.g. backoff, controller restart) — we don't need to wait for it to fire
+// before the FerrFlowSecret reconciles against the new token.
+func (r *FerrFlowSecretReconciler) secretsReferencingTokenSecret(
+	ctx context.Context,
+	obj client.Object,
+) []reconcile.Request {
+	// The Connection reconciler already registered an index on
+	// `.spec.tokenSecretRef.name`, reuse it.
+	var conns ffv1alpha1.FerrFlowConnectionList
+	if err := r.List(ctx, &conns,
+		client.InNamespace(obj.GetNamespace()),
+		client.MatchingFields{".spec.tokenSecretRef.name": obj.GetName()},
+	); err != nil {
+		return nil
+	}
+	if len(conns.Items) == 0 {
+		// Not a token Secret that any Connection references. Common case for
+		// every other Secret in the namespace — bail cheap.
+		return nil
+	}
+	var all []reconcile.Request
+	for i := range conns.Items {
+		var list ffv1alpha1.FerrFlowSecretList
+		if err := r.List(ctx, &list,
+			client.InNamespace(conns.Items[i].Namespace),
+			client.MatchingFields{connectionRefIndexKey: conns.Items[i].Name},
+		); err != nil {
+			continue
+		}
+		all = append(all, requestsForList(list.Items)...)
+	}
+	return all
+}
+
+// requestsForList turns a slice of CRs into reconcile requests. Same pattern
+// used by the Connection reconciler — keep the two in sync.
+func requestsForList(items []ffv1alpha1.FerrFlowSecret) []reconcile.Request {
+	reqs := make([]reconcile.Request, 0, len(items))
+	for i := range items {
+		reqs = append(reqs, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: items[i].Namespace,
+				Name:      items[i].Name,
+			},
+		})
+	}
+	return reqs
 }
