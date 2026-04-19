@@ -52,6 +52,12 @@ type FerrFlowSecretReconciler struct {
 	// the reconciler falls back to defaultClientFactory, which hands back a
 	// real *ferrflow.Client. Unit tests inject a fake here.
 	ClientFactory ClientFactory
+
+	// Broker resolves the bearer for the connection's configured auth
+	// mode. Shared with the Connection reconciler so the OIDC cache isn't
+	// split across controllers. Defaults to a fresh broker if nil — tests
+	// leave it unset and rely on a per-test fake.
+	Broker *TokenBroker
 }
 
 // +kubebuilder:rbac:groups=ferrflow.io,resources=ferrflowsecrets,verbs=get;list;watch;create;update;patch;delete
@@ -213,27 +219,16 @@ func (r *FerrFlowSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	return ctrl.Result{RequeueAfter: r.refreshInterval(&cr)}, nil
 }
 
-// loadToken reads the API token out of the referenced Secret.
+// loadToken routes through the shared TokenBroker so both auth modes
+// (tokenSecretRef and OIDC exchange) work without the reconciler knowing
+// which one a given connection uses. The broker also caches OIDC bearers
+// so high-traffic reveals don't hit `/clusters/oidc-exchange` every time.
 func (r *FerrFlowSecretReconciler) loadToken(ctx context.Context, conn *ffv1alpha1.FerrFlowConnection) (string, error) {
-	var tokenSecret corev1.Secret
-	key := types.NamespacedName{
-		Namespace: conn.Namespace,
-		Name:      conn.Spec.TokenSecretRef.Name,
+	broker := r.Broker
+	if broker == nil {
+		broker = NewTokenBroker(r.Client)
 	}
-	if err := r.Get(ctx, key, &tokenSecret); err != nil {
-		return "", fmt.Errorf("load token Secret %s: %w", key, err)
-	}
-	raw, ok := tokenSecret.Data[conn.Spec.TokenSecretRef.Key]
-	if !ok {
-		return "", fmt.Errorf("key %q missing from token Secret %s",
-			conn.Spec.TokenSecretRef.Key, key)
-	}
-	token := string(raw)
-	if token == "" {
-		return "", fmt.Errorf("token Secret %s has empty value at key %q",
-			key, conn.Spec.TokenSecretRef.Key)
-	}
-	return token, nil
+	return broker.TokenFor(ctx, conn)
 }
 
 // ensureTargetSecret creates or updates the Kubernetes Secret that mirrors the

@@ -1,0 +1,30 @@
+# OIDC / workload-identity flavour. No long-lived secret at rest — the
+# operator exchanges its projected ServiceAccount token for a short-lived
+# cluster bearer on every cache miss.
+#
+# Prerequisites (one-time, on the FerrFlow side):
+#   1. Create a cluster via `POST /orgs/:org/clusters`. Note the returned id.
+#   2. Register the OIDC config:
+#      PUT /orgs/:org/clusters/:id/oidc
+#      { "issuer":    "https://kubernetes.default.svc.cluster.local",
+#        "subject":   "system:serviceaccount:ferrflow-system:ferrflow-operator",
+#        "jwks_url":  "https://<api-server>/openid/v1/jwks" }
+#
+# Prerequisites (on the cluster side):
+#   * The operator Deployment mounts a projected SA token — see
+#     `config/samples/operator_oidc_deployment_snippet.yaml`.
+apiVersion: ferrflow.io/v1alpha1
+kind: FerrFlowConnection
+metadata:
+  name: prod
+  namespace: default
+spec:
+  url: https://ferrflow.example.com
+  organization: acme
+  oidc:
+    # UUID of the cluster resource registered in FerrFlow. Copy-paste from
+    # the UI after creating the cluster.
+    clusterID: "00000000-0000-0000-0000-000000000000"
+    # Defaults when omitted:
+    # tokenPath: /var/run/secrets/ferrflow/token
+    # audience:  https://ferrflow.com
