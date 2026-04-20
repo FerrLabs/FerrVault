@@ -499,6 +499,94 @@ func TestReconcile_OwnerReferencePropagation(t *testing.T) {
 	}
 }
 
+// reconcilerWithIndexes builds a fake-client reconciler where the field
+// indexes the real manager would have installed via `SetupWithManager` are
+// pre-registered on the fake client. Needed by the watch-map-func tests
+// because they invoke helpers that do `MatchingFields` lookups.
+func reconcilerWithIndexes(t *testing.T, objs ...client.Object) *FerrFlowSecretReconciler {
+	t.Helper()
+	scheme := newTestScheme(t)
+	c := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(objs...).
+		WithIndex(&ffv1alpha1.FerrFlowSecret{}, connectionRefIndexKey,
+			func(obj client.Object) []string {
+				return []string{obj.(*ffv1alpha1.FerrFlowSecret).Spec.ConnectionRef.Name}
+			}).
+		WithIndex(&ffv1alpha1.FerrFlowConnection{}, ".spec.tokenSecretRef.name",
+			func(obj client.Object) []string {
+				return []string{obj.(*ffv1alpha1.FerrFlowConnection).Spec.TokenSecretRef.Name}
+			}).
+		Build()
+	return &FerrFlowSecretReconciler{Client: c, Scheme: scheme}
+}
+
+func TestWatch_ConnectionChangeEnqueuesReferencingSecrets(t *testing.T) {
+	// Two FerrFlowSecrets reference the same Connection; a third references a
+	// different one. Only the two should be enqueued.
+	cr1 := baseCR()
+	cr1.Name = "cr1"
+	cr2 := baseCR()
+	cr2.Name = "cr2"
+	cr3 := baseCR()
+	cr3.Name = "cr3"
+	cr3.Spec.ConnectionRef.Name = "other-conn"
+	conn := baseConn()
+
+	r := reconcilerWithIndexes(t, cr1, cr2, cr3, conn)
+
+	reqs := r.secretsReferencingConnection(context.Background(), conn)
+	if got, want := len(reqs), 2; got != want {
+		t.Fatalf("expected %d reconcile requests, got %d: %+v", want, got, reqs)
+	}
+	seen := map[string]bool{}
+	for _, req := range reqs {
+		seen[req.Name] = true
+	}
+	if !seen["cr1"] || !seen["cr2"] || seen["cr3"] {
+		t.Fatalf("expected cr1 and cr2 enqueued, not cr3; got %+v", seen)
+	}
+}
+
+func TestWatch_TokenSecretChangeEnqueuesAllReferencingSecrets(t *testing.T) {
+	// Chain: token Secret → Connection (via tokenSecretRef) → FerrFlowSecret
+	// (via connectionRef). Updating the token Secret should enqueue the
+	// downstream CR.
+	cr := baseCR()
+	conn := baseConn() // refs testTokenSecret
+	tok := baseTokenSecret()
+
+	r := reconcilerWithIndexes(t, cr, conn, tok)
+	reqs := r.secretsReferencingTokenSecret(context.Background(), tok)
+	if got, want := len(reqs), 1; got != want {
+		t.Fatalf("expected %d reconcile requests, got %d", want, got)
+	}
+	if reqs[0].Name != testCRName {
+		t.Fatalf("expected %q, got %q", testCRName, reqs[0].Name)
+	}
+}
+
+func TestWatch_UnrelatedSecretChangeDoesNotEnqueue(t *testing.T) {
+	// A random Secret in the namespace that no Connection references must
+	// produce zero reconcile requests — otherwise every kubelet-generated
+	// Secret mutation would fan out to every FerrFlowSecret.
+	cr := baseCR()
+	conn := baseConn()
+	tok := baseTokenSecret()
+	unrelated := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "some-other-secret",
+			Namespace: testNamespace,
+		},
+	}
+
+	r := reconcilerWithIndexes(t, cr, conn, tok)
+	reqs := r.secretsReferencingTokenSecret(context.Background(), unrelated)
+	if got := len(reqs); got != 0 {
+		t.Fatalf("expected no reconcile requests for unrelated Secret, got %d", got)
+	}
+}
+
 // containsSubstring is a tiny helper so we don't drag in strings for a one-off
 // `Contains` check in the MissingKeys test.
 func containsSubstring(haystack, needle string) bool {
