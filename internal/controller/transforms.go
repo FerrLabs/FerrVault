@@ -201,9 +201,17 @@ func applyJSONExpand(in map[string]string, t ffv1alpha1.SecretTransform) (map[st
 		}
 	}
 	flat := make(map[string]string)
-	flattenJSON(strings.ToUpper(t.Key), obj, flat)
+	if err := flattenJSON(strings.ToUpper(t.Key), obj, flat); err != nil {
+		return nil, &TransformError{
+			Type: t.Type,
+			Msg:  fmt.Sprintf("key %q: %v", t.Key, err),
+		}
+	}
 
-	out := make(map[string]string, len(in)+len(flat))
+	// Don't pre-size with `len(in)+len(flat)` — CodeQL flags the add as a
+	// potential overflow on 32-bit builds. The performance delta from
+	// letting the map grow is noise next to the JSON unmarshal above.
+	out := make(map[string]string)
 	for k, v := range in {
 		if k == t.Key {
 			continue
@@ -226,7 +234,7 @@ func applyJSONExpand(in map[string]string, t ffv1alpha1.SecretTransform) (map[st
 // Nested objects compose names with `_`. Arrays and primitives are stored
 // as their JSON representation at the current prefix — avoids inventing an
 // array-index notation for the MVP while still round-tripping.
-func flattenJSON(prefix string, v any, out map[string]string) {
+func flattenJSON(prefix string, v any, out map[string]string) error {
 	switch typed := v.(type) {
 	case map[string]any:
 		// Sort keys for deterministic output — the content-hash annotation
@@ -237,7 +245,9 @@ func flattenJSON(prefix string, v any, out map[string]string) {
 		}
 		sort.Strings(keys)
 		for _, k := range keys {
-			flattenJSON(prefix+"_"+strings.ToUpper(k), typed[k], out)
+			if err := flattenJSON(prefix+"_"+strings.ToUpper(k), typed[k], out); err != nil {
+				return err
+			}
 		}
 	case string:
 		out[prefix] = typed
@@ -255,12 +265,17 @@ func flattenJSON(prefix string, v any, out map[string]string) {
 	case nil:
 		out[prefix] = ""
 	default:
-		// Arrays (and anything exotic) round-trip via JSON. Silently
-		// ignoring the error is fine: json.Marshal only fails on unsupported
-		// types, none of which come out of json.Unmarshal.
-		b, _ := json.Marshal(typed)
+		// Arrays and anything exotic round-trip via JSON. In practice the
+		// error branch is unreachable — every value in `v` came out of
+		// json.Unmarshal into `any`, which only produces marshalable types
+		// — but we propagate it rather than drop the error on the floor.
+		b, err := json.Marshal(typed)
+		if err != nil {
+			return fmt.Errorf("marshal leaf at %s: %w", prefix, err)
+		}
 		out[prefix] = string(b)
 	}
+	return nil
 }
 
 func formatJSONNumber(f float64) string {
