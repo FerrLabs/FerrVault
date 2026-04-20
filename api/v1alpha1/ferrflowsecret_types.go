@@ -52,6 +52,55 @@ type WorkloadRef struct {
 	Name string `json:"name"`
 }
 
+// SecretTransform rewrites the `{key: value}` map returned by the FerrFlow
+// API before it lands in the target Secret. Transforms are applied in the
+// order declared. Exactly one of the payload fields relevant to `type` must
+// be set — the CRD enforces this via OpenAPI validation at admission time.
+//
+// Supported types:
+//
+//   - prefix:        Stamp `value` in front of every key.
+//   - suffix:        Append `value` to every key.
+//   - rename:        Project `from` to `to`. No-op when `from` is missing.
+//   - base64Decode:  Base64-decode the values for the listed `keys`.
+//                    Empty `keys` means every key.
+//   - jsonExpand:    Flatten a JSON object stored under `key` into new
+//                    `<key>_<SUB_KEY>` entries. Nested objects produce
+//                    underscore-joined keys (upper-cased). The source key
+//                    is dropped.
+type SecretTransform struct {
+	// Type identifies the transform kind.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum=prefix;suffix;rename;base64Decode;jsonExpand
+	Type string `json:"type"`
+
+	// Value is the payload for `prefix` and `suffix`.
+	//
+	// +optional
+	Value string `json:"value,omitempty"`
+
+	// From is the source key for `rename`.
+	//
+	// +optional
+	From string `json:"from,omitempty"`
+
+	// To is the destination key for `rename`.
+	//
+	// +optional
+	To string `json:"to,omitempty"`
+
+	// Keys restricts `base64Decode` to a subset of keys. Empty = all keys.
+	//
+	// +optional
+	Keys []string `json:"keys,omitempty"`
+
+	// Key is the source key for `jsonExpand`.
+	//
+	// +optional
+	Key string `json:"key,omitempty"`
+}
+
 // FerrFlowSecretSpec declares a sync from a FerrFlow vault into a native
 // Kubernetes Secret. The operator reconciles this CR on the configured
 // `refreshInterval`, or immediately when the spec changes.
@@ -99,6 +148,13 @@ type FerrFlowSecretSpec struct {
 	//
 	// +optional
 	RolloutRestart []WorkloadRef `json:"rolloutRestart,omitempty"`
+
+	// Transforms rewrite the revealed key/value map before it's written to
+	// the target Secret. Applied in order. See SecretTransform for the
+	// supported operations.
+	//
+	// +optional
+	Transforms []SecretTransform `json:"transforms,omitempty"`
 }
 
 // FerrFlowSecretStatus reports the last reconciliation outcome.
@@ -232,6 +288,22 @@ func (in *FerrFlowSecretSpec) DeepCopyInto(out *FerrFlowSecretSpec) {
 	if in.RolloutRestart != nil {
 		out.RolloutRestart = make([]WorkloadRef, len(in.RolloutRestart))
 		copy(out.RolloutRestart, in.RolloutRestart)
+	}
+	if in.Transforms != nil {
+		out.Transforms = make([]SecretTransform, len(in.Transforms))
+		for i := range in.Transforms {
+			in.Transforms[i].DeepCopyInto(&out.Transforms[i])
+		}
+	}
+}
+
+// DeepCopyInto copies the receiver into out. Keys slice is copied
+// element-wise; all other fields are scalars.
+func (in *SecretTransform) DeepCopyInto(out *SecretTransform) {
+	*out = *in
+	if in.Keys != nil {
+		out.Keys = make([]string, len(in.Keys))
+		copy(out.Keys, in.Keys)
 	}
 }
 
