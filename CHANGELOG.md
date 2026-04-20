@@ -4,6 +4,12 @@ All notable changes to `ferrflow-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [0.9.0] - 2026-04-20
+
+### Features
+
+- feat(operator): watch referenced token Secret + Connection on FerrFlowSecret reconciler (#36) (#43)
+
 ## [0.8.0] - 2026-04-19
 
 ### Features
