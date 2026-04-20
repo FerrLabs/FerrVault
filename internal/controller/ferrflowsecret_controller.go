@@ -43,6 +43,12 @@ const (
 	// restart` uses internally — writing any new value to a pod template
 	// annotation triggers the controller's rollout.
 	annotationRestartedAt = "ferrflow.io/restarted-at"
+
+	// ferrFlowSecretFinalizer blocks deletion until the reconciler has run its
+	// pre-delete cleanup (currently: stamp a final log entry, drop metrics).
+	// Extension hook — future audit push / API-side deregistration plugs in
+	// at `runPreDeleteCleanup` without needing another CRD change.
+	ferrFlowSecretFinalizer = "ferrflow.io/secret-cleanup"
 )
 
 // FerrFlowSecretReconciler reconciles a FerrFlowSecret object against its
@@ -94,13 +100,43 @@ func (r *FerrFlowSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	var cr ffv1alpha1.FerrFlowSecret
 	if err := r.Get(ctx, req.NamespacedName, &cr); err != nil {
 		if apierrors.IsNotFound(err) {
-			// Deleted — owner references on the generated Secret will GC it.
-			// Drop the per-CR gauge so label cardinality doesn't grow forever.
+			// Fully removed — the finalizer cleanup path ran on a previous
+			// reconcile and we just saw the garbage-collection event. Drop the
+			// per-CR gauge so label cardinality doesn't grow forever.
 			DeleteLastSyncTimestamp(req.Namespace, req.Name)
 			result = "success"
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("load FerrFlowSecret: %w", err)
+	}
+
+	// --- 1b. Finalizer handling. Runs *before* any reveal logic so cleanup
+	// isn't blocked by a broken upstream connection — a deletion must always
+	// be able to complete, even if the API is unreachable.
+	if cr.DeletionTimestamp.IsZero() {
+		// Normal path. Ensure the finalizer is present so a future delete
+		// funnels through our cleanup code.
+		if controllerutil.AddFinalizer(&cr, ferrFlowSecretFinalizer) {
+			if err := r.Update(ctx, &cr); err != nil {
+				return ctrl.Result{}, fmt.Errorf("add finalizer: %w", err)
+			}
+			// controller-runtime immediately re-reconciles after the update;
+			// don't proceed with the rest of the work on this stale snapshot.
+			result = "success"
+			return ctrl.Result{}, nil
+		}
+	} else {
+		// Delete path. Run cleanup then drop the finalizer — the API server
+		// will then GC the CR + owner-ref-tied target Secret.
+		logger.Info("running pre-delete cleanup")
+		r.runPreDeleteCleanup(ctx, &cr)
+		if controllerutil.RemoveFinalizer(&cr, ferrFlowSecretFinalizer) {
+			if err := r.Update(ctx, &cr); err != nil {
+				return ctrl.Result{}, fmt.Errorf("remove finalizer: %w", err)
+			}
+		}
+		result = "success"
+		return ctrl.Result{}, nil
 	}
 
 	// --- 2. Resolve the connection and build a client.
@@ -225,6 +261,30 @@ func (r *FerrFlowSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	return ctrl.Result{RequeueAfter: r.refreshInterval(&cr)}, nil
+}
+
+// runPreDeleteCleanup runs side-effect-free teardown for a FerrFlowSecret
+// that's being deleted. Kept minimal on purpose for the MVP:
+//
+//   - Emit a structured log line so operators can see the delete was honoured.
+//   - Drop the per-CR last-sync gauge so label cardinality doesn't leak.
+//
+// The owner reference on the target Secret takes care of the actual cleanup;
+// this method exists as the extension point for future work (API-side
+// deregistration, audit-log push, external hooks — issue #39 calls them out).
+// It deliberately never returns an error — a misbehaving cleanup step should
+// not block a legitimate delete.
+func (r *FerrFlowSecretReconciler) runPreDeleteCleanup(
+	ctx context.Context,
+	cr *ffv1alpha1.FerrFlowSecret,
+) {
+	logger := log.FromContext(ctx).WithValues("ferrflowsecret", client.ObjectKeyFromObject(cr))
+	logger.Info("pre-delete cleanup",
+		"target", cr.Spec.Target.Name,
+		"vault", cr.Spec.Vault,
+		"project", cr.Spec.Project,
+	)
+	DeleteLastSyncTimestamp(cr.Namespace, cr.Name)
 }
 
 // loadToken routes through the shared TokenBroker so both auth modes

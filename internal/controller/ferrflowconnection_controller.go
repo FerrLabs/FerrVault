@@ -22,6 +22,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -34,6 +35,17 @@ import (
 // usually flip on smaller timescales, and users changing the URL or token
 // trigger immediate reconciles via the watches in `SetupWithManager`.
 const connectionProbeInterval = 10 * time.Minute
+
+// ferrFlowConnectionFinalizer blocks deletion until no FerrFlowSecret in the
+// same namespace still references this Connection. Without it, `kubectl
+// delete ffc` would silently leave every downstream `ffs` with a dangling
+// reference that reconciles into `ConnectionNotFound` errors.
+const ferrFlowConnectionFinalizer = "ferrflow.io/connection-cleanup"
+
+// connectionInUseRequeue is how often we re-check whether the Connection is
+// still in use during a pending-delete. Keep it moderate — users tearing down
+// a namespace see the delete complete within a tick of finishing the last ffs.
+const connectionInUseRequeue = 30 * time.Second
 
 // FerrFlowConnectionReconciler reports whether a FerrFlowConnection's
 // configured FerrFlow API instance is reachable and whether the referenced
@@ -67,6 +79,20 @@ func (r *FerrFlowConnectionReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return ctrl.Result{}, fmt.Errorf("load FerrFlowConnection: %w", err)
 	}
 
+	// Finalizer bookkeeping runs before the probe. A Connection being deleted
+	// shouldn't waste cycles probing upstream — the decision we need is
+	// strictly local ("are there still FerrFlowSecrets pointing at me?").
+	if conn.DeletionTimestamp.IsZero() {
+		if controllerutil.AddFinalizer(&conn, ferrFlowConnectionFinalizer) {
+			if err := r.Update(ctx, &conn); err != nil {
+				return ctrl.Result{}, fmt.Errorf("add finalizer: %w", err)
+			}
+			return ctrl.Result{}, nil
+		}
+	} else {
+		return r.handleDelete(ctx, &conn)
+	}
+
 	status, reason, message := r.probe(ctx, &conn)
 	logger.Info("probe finished", "ready", status, "reason", reason)
 
@@ -83,6 +109,73 @@ func (r *FerrFlowConnectionReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 	SetConnectionReady(conn.Namespace, conn.Name, status == metav1.ConditionTrue)
 	return ctrl.Result{RequeueAfter: connectionProbeInterval}, nil
+}
+
+// handleDelete runs during the pending-delete phase: refuses to remove the
+// finalizer while any FerrFlowSecret in the same namespace still references
+// this Connection. The alternative — silently completing the delete — leaves
+// every downstream `ffs` reconciling into `ConnectionNotFound` errors, which
+// is the failure mode issue #39 was opened against.
+//
+// When the Connection is still in use, we stamp a user-visible condition on
+// the CR so `kubectl get ffc` surfaces *why* the delete is stuck.
+func (r *FerrFlowConnectionReconciler) handleDelete(
+	ctx context.Context,
+	conn *ffv1alpha1.FerrFlowConnection,
+) (ctrl.Result, error) {
+	logger := log.FromContext(ctx).WithValues("ferrflowconnection", client.ObjectKeyFromObject(conn))
+
+	// Fast path: nothing references us any more → finalize.
+	var dependants ffv1alpha1.FerrFlowSecretList
+	if err := r.List(ctx, &dependants,
+		client.InNamespace(conn.Namespace),
+		client.MatchingFields{connectionRefIndexKey: conn.Name},
+	); err != nil {
+		return ctrl.Result{}, fmt.Errorf("list dependants: %w", err)
+	}
+
+	if len(dependants.Items) == 0 {
+		logger.Info("no dependants remain, removing finalizer")
+		DeleteConnectionReady(conn.Namespace, conn.Name)
+		if controllerutil.RemoveFinalizer(conn, ferrFlowConnectionFinalizer) {
+			if err := r.Update(ctx, conn); err != nil {
+				return ctrl.Result{}, fmt.Errorf("remove finalizer: %w", err)
+			}
+		}
+		return ctrl.Result{}, nil
+	}
+
+	// Still in use. Name a few of the blockers in the condition so a user
+	// running `kubectl describe ffc` can see exactly what's blocking them.
+	names := make([]string, 0, len(dependants.Items))
+	for i := range dependants.Items {
+		names = append(names, dependants.Items[i].Name)
+		if len(names) == 5 {
+			break
+		}
+	}
+	suffix := ""
+	if len(dependants.Items) > len(names) {
+		suffix = fmt.Sprintf(" (and %d more)", len(dependants.Items)-len(names))
+	}
+	message := fmt.Sprintf(
+		"cannot delete: still referenced by %d FerrFlowSecret(s): %v%s",
+		len(dependants.Items), names, suffix,
+	)
+	logger.Info("delete blocked", "dependants", len(dependants.Items))
+
+	now := metav1.Now()
+	conn.Status.LastCheckedAt = &now
+	setCondition(&conn.Status.Conditions, metav1.Condition{
+		Type:    "Ready",
+		Status:  metav1.ConditionFalse,
+		Reason:  "DeletionBlocked",
+		Message: message,
+	})
+	if err := r.Status().Update(ctx, conn); err != nil {
+		return ctrl.Result{}, fmt.Errorf("update status: %w", err)
+	}
+	return ctrl.Result{RequeueAfter: connectionInUseRequeue}, nil
 }
 
 // probe returns `(status, reason, message)` describing the Ready condition

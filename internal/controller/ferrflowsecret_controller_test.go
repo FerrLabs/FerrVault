@@ -8,6 +8,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -73,6 +74,10 @@ func newTestScheme(t *testing.T) *runtime.Scheme {
 
 // baseCR returns a FerrFlowSecret populated with the test defaults. The caller
 // can mutate before handing it to the builder.
+//
+// The finalizer is pre-set so reconcile tests don't need to drive a second
+// pass just to skip past the finalizer-add return. The production path adds
+// it on first reconcile; we simulate the steady state.
 func baseCR() *ffv1alpha1.FerrFlowSecret {
 	return &ffv1alpha1.FerrFlowSecret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -80,6 +85,7 @@ func baseCR() *ffv1alpha1.FerrFlowSecret {
 			Namespace:  testNamespace,
 			UID:        "cr-uid",
 			Generation: 1,
+			Finalizers: []string{ferrFlowSecretFinalizer},
 		},
 		Spec: ffv1alpha1.FerrFlowSecretSpec{
 			ConnectionRef:   ffv1alpha1.LocalObjectReference{Name: testConnName},
@@ -585,6 +591,70 @@ func TestWatch_UnrelatedSecretChangeDoesNotEnqueue(t *testing.T) {
 	if got := len(reqs); got != 0 {
 		t.Fatalf("expected no reconcile requests for unrelated Secret, got %d", got)
 	}
+}
+
+func TestFinalizer_AddedOnFirstReconcile(t *testing.T) {
+	// Build a CR *without* the finalizer — represents the genuine first
+	// reconcile, not the steady-state baseCR pre-seeds.
+	cr := baseCR()
+	cr.Finalizers = nil
+	conn := baseConn()
+	tok := baseTokenSecret()
+
+	r := newTestReconciler(t, []client.Object{cr, conn, tok}, &fakeFerrFlow{})
+
+	if _, err := reconcileOnce(t, r, cr); err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	if !slicesContains(cr.Finalizers, ferrFlowSecretFinalizer) {
+		t.Fatalf("expected finalizer %q, got %v", ferrFlowSecretFinalizer, cr.Finalizers)
+	}
+}
+
+func TestFinalizer_RemovedOnDelete(t *testing.T) {
+	// CR has the finalizer and a deletionTimestamp — the reconciler should
+	// strip the finalizer without running the upstream reveal.
+	now := metav1.Now()
+	cr := baseCR()
+	cr.DeletionTimestamp = &now
+	conn := baseConn()
+	tok := baseTokenSecret()
+
+	fakeFF := &fakeFerrFlow{}
+	r := newTestReconciler(t, []client.Object{cr, conn, tok}, fakeFF)
+
+	req := ctrl.Request{NamespacedName: types.NamespacedName{
+		Namespace: cr.Namespace,
+		Name:      cr.Name,
+	}}
+	if _, err := r.Reconcile(context.Background(), req); err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	if fakeFF.calls != 0 {
+		t.Fatalf("reveal was called during delete path: %d", fakeFF.calls)
+	}
+	// After finalizer removal on a CR with a deletionTimestamp, the fake
+	// client GCs the object — Get returns NotFound, which is the shape we
+	// expect in production too (kube-apiserver finishes the delete once the
+	// last finalizer is gone).
+	var after ffv1alpha1.FerrFlowSecret
+	err := r.Get(context.Background(), req.NamespacedName, &after)
+	if err == nil {
+		t.Fatalf("expected CR to be gone after finalizer removal, got: %+v", after)
+	}
+	if !apierrors.IsNotFound(err) {
+		t.Fatalf("expected NotFound after finalizer removal, got: %v", err)
+	}
+}
+
+// slicesContains is a tiny replacement for slices.Contains without the dep.
+func slicesContains[T comparable](s []T, v T) bool {
+	for i := range s {
+		if s[i] == v {
+			return true
+		}
+	}
+	return false
 }
 
 // containsSubstring is a tiny helper so we don't drag in strings for a one-off
