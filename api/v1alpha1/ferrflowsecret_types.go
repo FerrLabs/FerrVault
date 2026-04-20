@@ -59,15 +59,12 @@ type WorkloadRef struct {
 //
 // Supported types:
 //
-//   - prefix:        Stamp `value` in front of every key.
-//   - suffix:        Append `value` to every key.
-//   - rename:        Project `from` to `to`. No-op when `from` is missing.
-//   - base64Decode:  Base64-decode the values for the listed `keys`.
-//                    Empty `keys` means every key.
-//   - jsonExpand:    Flatten a JSON object stored under `key` into new
-//                    `<key>_<SUB_KEY>` entries. Nested objects produce
-//                    underscore-joined keys (upper-cased). The source key
-//                    is dropped.
+//   - prefix: Stamp `value` in front of every key.
+//   - suffix: Append `value` to every key.
+//   - rename: Project `from` to `to`. No-op when `from` is missing.
+//   - base64Decode: Decode the listed `keys` (or all when empty) from base64.
+//   - jsonExpand: Flatten a JSON object under `key` into `<KEY>_<SUB>` entries.
+//     Nested objects compose with `_`. The source key is dropped.
 type SecretTransform struct {
 	// Type identifies the transform kind.
 	//

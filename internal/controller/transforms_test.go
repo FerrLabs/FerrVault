@@ -235,8 +235,8 @@ func TestApplyTransforms_Composition(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	want := map[string]string{
-		"APP_DB_URL":            "postgres://",
-		"APP_STRIPE_KEY":        "s3cret",
+		"APP_DB_URL":             "postgres://",
+		"APP_STRIPE_KEY":         "s3cret",
 		"APP_CONFIG_JSON_REGION": "eu-west",
 	}
 	if !reflect.DeepEqual(out, want) {
