@@ -190,17 +190,27 @@ func (r *FerrFlowSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return r.failReadyWithRequeue(ctx, &cr, "Unreachable", err.Error(), r.refreshInterval(&cr))
 	}
 
+	// --- 3b. Apply user-declared value transforms before we hash or write.
+	// Transform failures surface as TransformError — deterministic, no
+	// requeue-spam benefit — so flag the CR Ready=False and wait for a spec
+	// edit to re-trigger reconciliation.
+	transformed, err := ApplyTransforms(reveal.Secrets, cr.Spec.Transforms)
+	if err != nil {
+		return r.failReady(ctx, &cr, "TransformError", err.Error())
+	}
+
 	// --- 4. Materialise the target Secret.
-	newHash := hashSecretData(reveal.Secrets)
-	secret, oldHash, err := r.ensureTargetSecret(ctx, &cr, reveal.Secrets, newHash)
+	newHash := hashSecretData(transformed)
+	secret, oldHash, err := r.ensureTargetSecret(ctx, &cr, transformed, newHash)
 	if err != nil {
 		return r.failReady(ctx, &cr, "SecretWriteFailed", err.Error())
 	}
 	contentChanged := oldHash != "" && oldHash != newHash
 	logger.Info("synced secret",
 		"target", secret.Name,
-		"keys", len(reveal.Secrets),
+		"keys", len(transformed),
 		"missing", len(reveal.Missing),
+		"transforms", len(cr.Spec.Transforms),
 		"contentChanged", contentChanged,
 	)
 
@@ -217,9 +227,11 @@ func (r *FerrFlowSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}
 
-	// --- 5. Update status.
-	syncedKeys := make([]string, 0, len(reveal.Secrets))
-	for k := range reveal.Secrets {
+	// --- 5. Update status. SyncedKeys reflects the post-transform map —
+	// that's what actually landed in the target Secret, so it's what users
+	// will compare against when diffing which env vars their workload sees.
+	syncedKeys := make([]string, 0, len(transformed))
+	for k := range transformed {
 		syncedKeys = append(syncedKeys, k)
 	}
 	sort.Strings(syncedKeys)
