@@ -58,6 +58,41 @@ On reconciliation the operator calls `GET /api/v1/orgs/:org/projects/:project/va
 
 The generated Secret is owned by the CR — deleting the CR garbage-collects the Secret.
 
+#### Value transforms
+
+Revealed values can be reshaped before they land in the target Secret via `spec.transforms`. Transforms are applied in order; each one sees the output of the previous step.
+
+```yaml
+spec:
+  connectionRef: { name: prod }
+  project: web
+  vault: production
+  selector:
+    names: [DATABASE_URL, STRIPE_KEY, CONFIG_JSON]
+  transforms:
+    - type: rename
+      from: DATABASE_URL
+      to: DB_URL
+    - type: base64Decode
+      keys: [STRIPE_KEY]          # omit `keys` to decode every value
+    - type: jsonExpand
+      key: CONFIG_JSON            # {"db":{"host":"pg"}} → CONFIG_JSON_DB_HOST=pg
+    - type: prefix
+      value: APP_                 # stamps APP_ on every remaining key
+```
+
+Supported types:
+
+| `type`         | Fields              | Effect                                                       |
+| -------------- | ------------------- | ------------------------------------------------------------ |
+| `prefix`       | `value`             | Prepends `value` to every key.                               |
+| `suffix`       | `value`             | Appends `value` to every key.                                |
+| `rename`       | `from`, `to`        | Projects one key. Missing `from` is a no-op; collisions fail.|
+| `base64Decode` | `keys` (optional)   | Decodes listed keys (or all when empty) from base64.         |
+| `jsonExpand`   | `key`               | Flattens a JSON object under `<KEY>_<SUB>`. Drops the source.|
+
+Malformed transforms (unknown type, invalid base64, non-object JSON, destination-key collisions) leave the CR in `Ready=False` with `Reason=TransformError` and increment `ferrflow_secret_sync_errors_total{reason="TransformError"}`. The target Secret is not written on failure — workloads keep the last known-good value.
+
 ## Running
 
 ### Helm (recommended)

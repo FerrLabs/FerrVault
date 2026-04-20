@@ -670,3 +670,85 @@ func containsSubstring(haystack, needle string) bool {
 	}
 	return false
 }
+
+// Reconcile-level coverage for spec.transforms. Unit tests in transforms_test
+// cover the pure-function behaviour; these tests make sure the pipeline runs
+// *before* the hash/write step, so transformed keys land in the target Secret
+// and malformed transforms flip Ready=False with reason TransformError.
+
+func TestReconcile_AppliesTransforms(t *testing.T) {
+	cr := baseCR()
+	cr.Spec.Transforms = []ffv1alpha1.SecretTransform{
+		{Type: TransformPrefix, Value: "APP_"},
+	}
+	conn := baseConn()
+	tok := baseTokenSecret()
+
+	fakeFF := &fakeFerrFlow{
+		bulkReveal: func(_ context.Context, _, _, _, _ string, _ []string) (*ferrflow.BulkRevealResponse, error) {
+			return &ferrflow.BulkRevealResponse{
+				Secrets: map[string]string{"DB_URL": "postgres://"},
+			}, nil
+		},
+	}
+	r := newTestReconciler(t, []client.Object{cr, conn, tok}, fakeFF)
+
+	if _, err := reconcileOnce(t, r, cr); err != nil {
+		t.Fatalf("Reconcile returned error: %v", err)
+	}
+
+	var got corev1.Secret
+	if err := r.Get(context.Background(), types.NamespacedName{
+		Namespace: testNamespace, Name: testTargetName,
+	}, &got); err != nil {
+		t.Fatalf("get target Secret: %v", err)
+	}
+	if got.StringData["APP_DB_URL"] != "postgres://" {
+		t.Fatalf("StringData[APP_DB_URL] = %q, want postgres://", got.StringData["APP_DB_URL"])
+	}
+	if _, ok := got.StringData["DB_URL"]; ok {
+		t.Fatalf("pre-transform key leaked into target: %v", got.StringData)
+	}
+
+	// Status should reflect the transformed key — that's what the workload
+	// actually reads, so that's what users look at in `kubectl describe`.
+	if len(cr.Status.SyncedKeys) != 1 || cr.Status.SyncedKeys[0] != "APP_DB_URL" {
+		t.Fatalf("SyncedKeys = %v, want [APP_DB_URL]", cr.Status.SyncedKeys)
+	}
+}
+
+func TestReconcile_TransformErrorFlipsReady(t *testing.T) {
+	cr := baseCR()
+	cr.Spec.Transforms = []ffv1alpha1.SecretTransform{
+		{Type: TransformBase64Decode, Keys: []string{"K"}},
+	}
+	conn := baseConn()
+	tok := baseTokenSecret()
+
+	fakeFF := &fakeFerrFlow{
+		bulkReveal: func(_ context.Context, _, _, _, _ string, _ []string) (*ferrflow.BulkRevealResponse, error) {
+			// Value is plainly not base64 — the transform must fail.
+			return &ferrflow.BulkRevealResponse{
+				Secrets: map[string]string{"K": "!!!"},
+			}, nil
+		},
+	}
+	r := newTestReconciler(t, []client.Object{cr, conn, tok}, fakeFF)
+
+	if _, err := reconcileOnce(t, r, cr); err != nil {
+		t.Fatalf("Reconcile returned error: %v", err)
+	}
+	ready := findReady(cr.Status.Conditions)
+	if ready == nil || ready.Status != metav1.ConditionFalse || ready.Reason != "TransformError" {
+		t.Fatalf("Ready = %+v, want False/TransformError", ready)
+	}
+	// No target Secret should have been written on a transform failure —
+	// otherwise a workload could see a half-applied map.
+	var got corev1.Secret
+	err := r.Get(context.Background(), types.NamespacedName{
+		Namespace: testNamespace, Name: testTargetName,
+	}, &got)
+	if err == nil {
+		t.Fatalf("target Secret was written despite transform error: %v", got.StringData)
+	}
+}
