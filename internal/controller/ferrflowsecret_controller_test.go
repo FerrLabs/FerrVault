@@ -597,7 +597,7 @@ func TestFinalizer_AddedOnFirstReconcile(t *testing.T) {
 	// Build a CR *without* the finalizer — represents the genuine first
 	// reconcile, not the steady-state baseCR pre-seeds.
 	cr := baseCR()
-	cr.ObjectMeta.Finalizers = nil
+	cr.Finalizers = nil
 	conn := baseConn()
 	tok := baseTokenSecret()
 
