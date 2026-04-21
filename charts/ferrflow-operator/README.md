@@ -1,18 +1,18 @@
 # ferrflow-operator
 
-Helm chart for the [ferrflow-operator](https://github.com/FerrFlow-Org/FerrFlow-Operator) — a Kubernetes operator that syncs secrets from a FerrFlow instance into native `Secret` resources.
+Helm chart for the [ferrflow-operator](https://github.com/FerrLabs/FerrFlow-Operator) — a Kubernetes operator that syncs secrets from a FerrFlow instance into native `Secret` resources.
 
 ## Install
 
 ```bash
-helm install ferrflow-operator oci://ghcr.io/ferrflow-org/charts/ferrflow-operator \
+helm install ferrflow-operator oci://ghcr.io/ferrlabs/charts/ferrflow-operator \
   --namespace ferrflow-operator-system --create-namespace
 ```
 
 Pin to a specific version:
 
 ```bash
-helm install ferrflow-operator oci://ghcr.io/ferrflow-org/charts/ferrflow-operator \
+helm install ferrflow-operator oci://ghcr.io/ferrlabs/charts/ferrflow-operator \
   --version 0.1.0 \
   --namespace ferrflow-operator-system --create-namespace
 ```
@@ -20,7 +20,7 @@ helm install ferrflow-operator oci://ghcr.io/ferrflow-org/charts/ferrflow-operat
 ## Upgrade
 
 ```bash
-helm upgrade ferrflow-operator oci://ghcr.io/ferrflow-org/charts/ferrflow-operator \
+helm upgrade ferrflow-operator oci://ghcr.io/ferrlabs/charts/ferrflow-operator \
   --namespace ferrflow-operator-system
 ```
 
@@ -42,7 +42,7 @@ kubectl delete crd ferrflowsecrets.ferrflow.io ferrflowconnections.ferrflow.io
 
 | Key | Default | Notes |
 |---|---|---|
-| `image.repository` | `ghcr.io/ferrflow-org/ferrflow-operator` | |
+| `image.repository` | `ghcr.io/ferrlabs/ferrflow-operator` | |
 | `image.tag` | `""` → `Chart.AppVersion` | |
 | `image.pullPolicy` | `IfNotPresent` | |
 | `imagePullSecrets` | `[]` | For private registries. |

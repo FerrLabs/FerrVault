@@ -84,11 +84,11 @@ docs: update Helm chart installation steps
 
 ## Reporting Bugs
 
-Use the [bug report template](https://github.com/FerrFlow-Org/FerrFlow-Operator/issues/new?template=bug_report.md).
+Use the [bug report template](https://github.com/FerrLabs/FerrFlow-Operator/issues/new?template=bug_report.md).
 
 ## Requesting Features
 
-Use the [feature request template](https://github.com/FerrFlow-Org/FerrFlow-Operator/issues/new?template=feature_request.md).
+Use the [feature request template](https://github.com/FerrLabs/FerrFlow-Operator/issues/new?template=feature_request.md).
 
 ## Security
 

@@ -17,7 +17,7 @@ spec:
       serviceAccountName: ferrflow-operator
       containers:
         - name: manager
-          image: ghcr.io/ferrflow-org/ferrflow-operator:latest
+          image: ghcr.io/ferrlabs/ferrflow-operator:latest
           volumeMounts:
             - name: ferrflow-token
               mountPath: /var/run/secrets/ferrflow

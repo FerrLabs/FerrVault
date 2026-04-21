@@ -22,8 +22,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	ffv1alpha1 "github.com/FerrFlow-Org/FerrFlow-Operator/api/v1alpha1"
-	"github.com/FerrFlow-Org/FerrFlow-Operator/internal/ferrflow"
+	ffv1alpha1 "github.com/FerrLabs/FerrFlow-Operator/api/v1alpha1"
+	"github.com/FerrLabs/FerrFlow-Operator/internal/ferrflow"
 )
 
 // connectionRefIndexKey is the field-indexer key for

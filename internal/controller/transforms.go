@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	ffv1alpha1 "github.com/FerrFlow-Org/FerrFlow-Operator/api/v1alpha1"
+	ffv1alpha1 "github.com/FerrLabs/FerrFlow-Operator/api/v1alpha1"
 )
 
 // Transform kind constants. Kept as typed strings rather than an iota enum
