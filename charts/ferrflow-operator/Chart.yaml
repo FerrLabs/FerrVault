@@ -13,7 +13,7 @@ kubeVersion: ">=1.28.0-0"
 
 home: https://ferrflow.com
 sources:
-  - https://github.com/FerrFlow-Org/FerrFlow-Operator
+  - https://github.com/FerrLabs/FerrFlow-Operator
 keywords:
   - ferrflow
   - secrets
@@ -31,4 +31,4 @@ annotations:
     - name: Documentation
       url: https://ferrflow.com/docs
     - name: Source
-      url: https://github.com/FerrFlow-Org/FerrFlow-Operator
+      url: https://github.com/FerrLabs/FerrFlow-Operator

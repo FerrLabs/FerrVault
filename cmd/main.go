@@ -20,8 +20,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	ffv1alpha1 "github.com/FerrFlow-Org/FerrFlow-Operator/api/v1alpha1"
-	"github.com/FerrFlow-Org/FerrFlow-Operator/internal/controller"
+	ffv1alpha1 "github.com/FerrLabs/FerrFlow-Operator/api/v1alpha1"
+	"github.com/FerrLabs/FerrFlow-Operator/internal/controller"
 )
 
 var (

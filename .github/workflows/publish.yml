@@ -65,9 +65,9 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/ferrflow-org/ferrflow-operator:${{ needs.resolve.outputs.version }}
-            ghcr.io/ferrflow-org/ferrflow-operator:v${{ needs.resolve.outputs.major }}
-            ghcr.io/ferrflow-org/ferrflow-operator:latest
+            ghcr.io/ferrlabs/ferrflow-operator:${{ needs.resolve.outputs.version }}
+            ghcr.io/ferrlabs/ferrflow-operator:v${{ needs.resolve.outputs.major }}
+            ghcr.io/ferrlabs/ferrflow-operator:latest
           # Embed the git SHA and build time so `docker inspect` is useful.
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
@@ -108,4 +108,4 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "$GH_TOKEN" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
-          helm push dist/ferrflow-operator-${{ needs.resolve.outputs.version }}.tgz oci://ghcr.io/ferrflow-org/charts
+          helm push dist/ferrflow-operator-${{ needs.resolve.outputs.version }}.tgz oci://ghcr.io/ferrlabs/charts

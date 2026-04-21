@@ -1,4 +1,4 @@
-module github.com/FerrFlow-Org/FerrFlow-Operator
+module github.com/FerrLabs/FerrFlow-Operator
 
 go 1.23.0
 

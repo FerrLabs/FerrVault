@@ -1,14 +1,14 @@
 # ferrflow-operator
 
-[![CI](https://github.com/FerrFlow-Org/FerrFlow-Operator/actions/workflows/ci.yml/badge.svg)](https://github.com/FerrFlow-Org/FerrFlow-Operator/actions/workflows/ci.yml)
-[![Release](https://github.com/FerrFlow-Org/FerrFlow-Operator/actions/workflows/release.yml/badge.svg)](https://github.com/FerrFlow-Org/FerrFlow-Operator/actions/workflows/release.yml)
-[![Latest release](https://img.shields.io/github/v/release/FerrFlow-Org/FerrFlow-Operator)](https://github.com/FerrFlow-Org/FerrFlow-Operator/releases/latest)
-[![Coverage](https://codecov.io/gh/FerrFlow-Org/FerrFlow-Operator/graph/badge.svg)](https://codecov.io/gh/FerrFlow-Org/FerrFlow-Operator)
-[![License](https://img.shields.io/github/license/FerrFlow-Org/FerrFlow-Operator)](LICENSE)
+[![CI](https://github.com/FerrLabs/FerrFlow-Operator/actions/workflows/ci.yml/badge.svg)](https://github.com/FerrLabs/FerrFlow-Operator/actions/workflows/ci.yml)
+[![Release](https://github.com/FerrLabs/FerrFlow-Operator/actions/workflows/release.yml/badge.svg)](https://github.com/FerrLabs/FerrFlow-Operator/actions/workflows/release.yml)
+[![Latest release](https://img.shields.io/github/v/release/FerrLabs/FerrFlow-Operator)](https://github.com/FerrLabs/FerrFlow-Operator/releases/latest)
+[![Coverage](https://codecov.io/gh/FerrLabs/FerrFlow-Operator/graph/badge.svg)](https://codecov.io/gh/FerrLabs/FerrFlow-Operator)
+[![License](https://img.shields.io/github/license/FerrLabs/FerrFlow-Operator)](LICENSE)
 
 Kubernetes operator that syncs secrets stored in [FerrFlow](https://ferrflow.com) into native Kubernetes `Secret` resources.
 
-> **Status: alpha.** The MVP reconciler is in place — it reads secrets from a FerrFlow vault via the bulk-reveal API and materialises them into a Kubernetes Secret, with owner-ref GC and status conditions. Rolling restarts, Helm chart, and integration tests are tracked in [issue #1](https://github.com/FerrFlow-Org/FerrFlow-Operator/issues/1).
+> **Status: alpha.** The MVP reconciler is in place — it reads secrets from a FerrFlow vault via the bulk-reveal API and materialises them into a Kubernetes Secret, with owner-ref GC and status conditions. Rolling restarts, Helm chart, and integration tests are tracked in [issue #1](https://github.com/FerrLabs/FerrFlow-Operator/issues/1).
 
 ## Custom resources
 
@@ -98,7 +98,7 @@ Malformed transforms (unknown type, invalid base64, non-object JSON, destination
 ### Helm (recommended)
 
 ```bash
-helm install ferrflow-operator oci://ghcr.io/ferrflow-org/charts/ferrflow-operator \
+helm install ferrflow-operator oci://ghcr.io/ferrlabs/charts/ferrflow-operator \
   --namespace ferrflow-operator-system --create-namespace
 ```
 
@@ -130,7 +130,7 @@ rendered from the chart *is* the canonical version.
 
 ## Prerequisites in FerrFlow
 
-The operator relies on endpoints in [`FerrFlow-Org/Application`](https://github.com/FerrFlow-Org/Application) that shipped in `api@v4.0.0`:
+The operator relies on endpoints in [`FerrLabs/Application`](https://github.com/FerrLabs/Application) that shipped in `api@v4.0.0`:
 
 - API token auth (`Authorization: Bearer fft_...`) with granular scopes — #268
 - `secrets:read` scope enforcement on all secrets routes — #268

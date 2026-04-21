@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	ffv1alpha1 "github.com/FerrFlow-Org/FerrFlow-Operator/api/v1alpha1"
+	ffv1alpha1 "github.com/FerrLabs/FerrFlow-Operator/api/v1alpha1"
 )
 
 // Tests exercise ApplyTransforms against the minimum set of behaviours we
