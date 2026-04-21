@@ -29,8 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	ffv1alpha1 "github.com/FerrFlow-Org/FerrFlow-Operator/api/v1alpha1"
-	"github.com/FerrFlow-Org/FerrFlow-Operator/internal/ferrflow"
+	ffv1alpha1 "github.com/FerrLabs/FerrFlow-Operator/api/v1alpha1"
+	"github.com/FerrLabs/FerrFlow-Operator/internal/ferrflow"
 )
 
 // oidcRefreshLeeway is how early (before expiry) we refresh the cached

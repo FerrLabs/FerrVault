@@ -49,8 +49,8 @@ Next steps:
 CRDs were NOT installed by this chart (`crds.install=false`). Apply them
 manually before creating any FerrFlow CRs:
 
-   kubectl apply -f https://raw.githubusercontent.com/FerrFlow-Org/FerrFlow-Operator/v{{ .Chart.AppVersion }}/charts/ferrflow-operator/crds/
+   kubectl apply -f https://raw.githubusercontent.com/FerrLabs/FerrFlow-Operator/v{{ .Chart.AppVersion }}/charts/ferrflow-operator/crds/
 {{- end }}
 
 Documentation: https://ferrflow.com/docs
-Repository:    https://github.com/FerrFlow-Org/FerrFlow-Operator
+Repository:    https://github.com/FerrLabs/FerrFlow-Operator

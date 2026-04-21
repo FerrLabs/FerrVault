@@ -3,7 +3,7 @@
 
 # --- Image ---
 image:
-  repository: ghcr.io/ferrflow-org/ferrflow-operator
+  repository: ghcr.io/ferrlabs/ferrflow-operator
   # Leave tag empty to fall back to `.Chart.AppVersion`. Override for pinning
   # to a specific commit / prerelease.
   tag: ""
