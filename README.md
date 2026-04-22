@@ -3,6 +3,7 @@
 [![Latest release](https://img.shields.io/github/v/release/FerrLabs/FerrFlow-Operator)](https://github.com/FerrLabs/FerrFlow-Operator/releases/latest)
 [![Coverage](https://codecov.io/gh/FerrLabs/FerrFlow-Operator/graph/badge.svg)](https://codecov.io/gh/FerrLabs/FerrFlow-Operator)
 [![License](https://img.shields.io/github/license/FerrLabs/FerrFlow-Operator)](LICENSE)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/FerrLabs/FerrVault/badge)](https://scorecard.dev/viewer/?uri=github.com/FerrLabs/FerrVault)
 
 Kubernetes operator that syncs secrets stored in [FerrFlow](https://ferrflow.com) into native Kubernetes `Secret` resources.
 
