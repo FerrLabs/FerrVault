@@ -1,7 +1,5 @@
 # ferrflow-operator
 
-[![CI](https://github.com/FerrLabs/FerrFlow-Operator/actions/workflows/ci.yml/badge.svg)](https://github.com/FerrLabs/FerrFlow-Operator/actions/workflows/ci.yml)
-[![Release](https://github.com/FerrLabs/FerrFlow-Operator/actions/workflows/release.yml/badge.svg)](https://github.com/FerrLabs/FerrFlow-Operator/actions/workflows/release.yml)
 [![Latest release](https://img.shields.io/github/v/release/FerrLabs/FerrFlow-Operator)](https://github.com/FerrLabs/FerrFlow-Operator/releases/latest)
 [![Coverage](https://codecov.io/gh/FerrLabs/FerrFlow-Operator/graph/badge.svg)](https://codecov.io/gh/FerrLabs/FerrFlow-Operator)
 [![License](https://img.shields.io/github/license/FerrLabs/FerrFlow-Operator)](LICENSE)
