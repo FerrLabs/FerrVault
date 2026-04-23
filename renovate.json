@@ -1,33 +1,14 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
-  "rebaseWhen": "behind-base-branch",
+  "extends": ["local>FerrLabs/.github"],
   "packageRules": [
     {
+      "description": "Go modules patch + minor — auto-merge",
+      "matchManagers": ["gomod"],
       "matchUpdateTypes": ["patch", "minor"],
-      "matchCategories": ["golang"],
       "automerge": true,
       "automergeType": "pr",
       "automergeStrategy": "squash"
-    },
-    {
-      "matchUpdateTypes": ["major"],
-      "labels": ["dependencies", "major", "renovate"],
-      "automerge": false
-    },
-    {
-      "matchManagers": ["github-actions"],
-      "automerge": true,
-      "automergeType": "pr",
-      "automergeStrategy": "squash",
-      "groupName": "GitHub Actions"
-    },
-    {
-      "matchCategories": ["docker"],
-      "automerge": true,
-      "automergeType": "pr",
-      "automergeStrategy": "squash",
-      "groupName": "Docker images"
     }
   ]
 }
