@@ -4,8 +4,9 @@
 package v1alpha1
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/controller-runtime/pkg/scheme"
 )
 
 // GroupVersion is the API group/version pair the controller watches.
@@ -13,7 +14,18 @@ var GroupVersion = schema.GroupVersion{Group: "ferrflow.io", Version: "v1alpha1"
 
 // SchemeBuilder registers the package's types with the runtime scheme so that
 // the manager can encode/decode them and the informers can list/watch them.
-var SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
+var SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
 
 // AddToScheme is the canonical entry point used by cmd/main.go.
 var AddToScheme = SchemeBuilder.AddToScheme
+
+func addKnownTypes(s *runtime.Scheme) error {
+	s.AddKnownTypes(GroupVersion,
+		&FerrFlowConnection{},
+		&FerrFlowConnectionList{},
+		&FerrFlowSecret{},
+		&FerrFlowSecretList{},
+	)
+	metav1.AddToGroupVersion(s, GroupVersion)
+	return nil
+}
