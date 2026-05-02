@@ -217,10 +217,6 @@ type FerrFlowSecretList struct {
 	Items           []FerrFlowSecret `json:"items"`
 }
 
-func init() {
-	SchemeBuilder.Register(&FerrFlowSecret{}, &FerrFlowSecretList{})
-}
-
 // DeepCopyInto copies the receiver into out.
 func (in *FerrFlowSecret) DeepCopyInto(out *FerrFlowSecret) {
 	*out = *in
