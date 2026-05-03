@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if command -v make >/dev/null 2>&1 && grep -qE '^test:' Makefile; then
+  make test
+else
+  echo "==> go test"
+  go test ./...
+fi

@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! git diff --cached --name-only --diff-filter=ACM | grep -qE '\.go$'; then
+  exit 0
+fi
+
+if command -v make >/dev/null 2>&1 && grep -qE '^fmt:' Makefile && grep -qE '^vet:' Makefile; then
+  make fmt vet
+else
+  echo "==> gofmt -l"
+  OUT=$(gofmt -l $(git diff --cached --name-only --diff-filter=ACM | grep -E '\.go$'))
+  if [ -n "$OUT" ]; then
+    echo "Files needing gofmt:"
+    echo "$OUT"
+    exit 1
+  fi
+  echo "==> go vet"
+  go vet ./...
+fi
