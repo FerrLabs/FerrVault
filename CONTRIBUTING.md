@@ -82,6 +82,15 @@ docs: update Helm chart installation steps
 - `golangci-lint run` with no warnings
 - Write tests for new reconciler logic, API client code, and CRD validation
 
+## Git hooks
+
+Run `./.githooks/install.sh` once after cloning. This sets `core.hooksPath = .githooks/`, enabling:
+
+- **pre-commit** — `gofmt` + `go vet` on staged Go files (uses `make fmt vet` if both targets exist).
+- **pre-push** — `go test ./...` (uses `make test` if available).
+
+No Node toolchain required.
+
 ## Reporting Bugs
 
 Use the [bug report template](https://github.com/FerrLabs/FerrFlow-Operator/issues/new?template=bug_report.md).
