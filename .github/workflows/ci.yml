@@ -7,86 +7,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: read
-
 jobs:
-  # Run Go checks only once the project has been scaffolded (go.mod present).
-  # Until then, the workflow is a no-op on empty commits to avoid red check marks
-  # on meta-only PRs (docs, CI config, etc.).
-  detect:
-    name: Detect Go project
-    runs-on: ubuntu-latest
-    outputs:
-      has_go: ${{ steps.check.outputs.has_go }}
-    steps:
-      - uses: actions/checkout@v6
-      - id: check
-        run: |
-          if [ -f go.mod ]; then
-            echo "has_go=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_go=false" >> "$GITHUB_OUTPUT"
-          fi
-
-  lint:
-    name: Lint
-    needs: detect
-    if: needs.detect.outputs.has_go == 'true' && (github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release):'))
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: Download dependencies
-        run: go mod download
-      - name: gofmt
-        run: |
-          diff=$(gofmt -l .)
-          if [ -n "$diff" ]; then
-            echo "Files need gofmt:"
-            echo "$diff"
-            exit 1
-          fi
-      - uses: golangci/golangci-lint-action@v9
-        with:
-          version: latest
-
-  test:
-    name: Test
-    needs: detect
-    if: needs.detect.outputs.has_go == 'true' && (github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release):'))
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: Download dependencies
-        run: go mod download
-      - name: Go test
-        run: go test -race -coverprofile=coverage.out ./...
-      - uses: codecov/codecov-action@v6
-        with:
-          files: coverage.out
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
-
-  build:
-    name: Build
-    needs: detect
-    if: needs.detect.outputs.has_go == 'true' && (github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release):'))
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: Download dependencies
-        run: go mod download
-      - name: Build manager
-        run: go build -o bin/manager ./cmd/...
+  ci:
+    name: CI
+    uses: FerrLabs/.github/.github/workflows/reusable-ci-go.yml@main
+    with:
+      build-paths: ./cmd/...
+    secrets: inherit
