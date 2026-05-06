@@ -3,7 +3,7 @@ name: E2E
 # Smoke test that spins up a real Kubernetes cluster (kind), builds the
 # operator image locally, installs via the Helm chart, applies sample CRs
 # backed by a mocked FerrFlow API, and asserts the reconciler behaves as
-# expected end-to-end. Catches bugs that `go build` + `golangci-lint` miss —
+# expected end-to-end. Catches bugs that `go build` + `golangci-lint` miss â€”
 # controller-runtime quirks, RBAC gaps, CRD schema errors, etc.
 
 on:
@@ -19,17 +19,17 @@ permissions:
 jobs:
   smoke:
     name: kind smoke test
-    # Skip on release-bot commits — they only bump Chart.yaml metadata, the
+    # Skip on release-bot commits â€” they only bump Chart.yaml metadata, the
     # code that matters has already been tested on the feature branch.
     if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release):')
-    runs-on: ubuntu-latest
+    runs-on: ferrlabs-k8s
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
 
       - name: Check Go project presence
         id: gate
-        # Same gate as ci.yml — no point spinning a cluster if the repo is
+        # Same gate as ci.yml â€” no point spinning a cluster if the repo is
         # still at scaffolding-only with no go.mod.
         run: |
           if [ -f go.mod ]; then
@@ -100,7 +100,7 @@ jobs:
         # This validates: the reconciler's full loop runs; CR status transitions
         # to Ready=False with a recognisable reason when the backend isn't
         # reachable. That's strictly better than a raw panic or a stuck
-        # reconciliation — and it means the RBAC, owner-refs and auth-loading
+        # reconciliation â€” and it means the RBAC, owner-refs and auth-loading
         # code paths all executed.
         run: |
           kubectl create namespace demo
@@ -141,13 +141,13 @@ jobs:
             reason=$(kubectl -n demo get ferrflowsecret web-env -o jsonpath='{.status.conditions[?(@.type=="Ready")].reason}' 2>/dev/null || echo "")
             echo "[${i}/30] Ready=${ready:-<unset>} Reason=${reason:-<unset>}"
             if [ "$ready" = "False" ] && [ -n "$reason" ]; then
-              echo "Reconciler reached the failure branch as expected — good."
+              echo "Reconciler reached the failure branch as expected â€” good."
               exit 0
             fi
             sleep 5
           done
 
-          echo "Timed out waiting for Ready=False — reconciler may be stuck."
+          echo "Timed out waiting for Ready=False â€” reconciler may be stuck."
           kubectl -n demo describe ferrflowsecret web-env
           kubectl logs -n ferrflow-operator-system -l app.kubernetes.io/name=ferrflow-operator --tail=200
           exit 1

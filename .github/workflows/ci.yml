@@ -16,7 +16,7 @@ jobs:
   # on meta-only PRs (docs, CI config, etc.).
   detect:
     name: Detect Go project
-    runs-on: ubuntu-latest
+    runs-on: ferrlabs-k8s
     outputs:
       has_go: ${{ steps.check.outputs.has_go }}
     steps:
@@ -33,7 +33,7 @@ jobs:
     name: Lint
     needs: detect
     if: needs.detect.outputs.has_go == 'true' && (github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release):'))
-    runs-on: ubuntu-latest
+    runs-on: ferrlabs-k8s
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
@@ -58,7 +58,7 @@ jobs:
     name: Test
     needs: detect
     if: needs.detect.outputs.has_go == 'true' && (github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release):'))
-    runs-on: ubuntu-latest
+    runs-on: ferrlabs-k8s
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
@@ -79,7 +79,7 @@ jobs:
     name: Build
     needs: detect
     if: needs.detect.outputs.has_go == 'true' && (github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release):'))
-    runs-on: ubuntu-latest
+    runs-on: ferrlabs-k8s
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6

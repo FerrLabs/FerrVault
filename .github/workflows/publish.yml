@@ -1,6 +1,6 @@
 name: Publish
 
-# Triggered after FerrFlow cuts a release commit (`chore(release): …`) on
+# Triggered after FerrFlow cuts a release commit (`chore(release): â€¦`) on
 # main. The release commit carries a `v*` tag; we key this workflow off the
 # tag push so we pick up the version exactly as FerrFlow tagged it.
 on:
@@ -21,7 +21,7 @@ permissions:
 jobs:
   resolve:
     name: Resolve version
-    runs-on: ubuntu-latest
+    runs-on: ferrlabs-k8s
     # Skip the rolling major-only tag (e.g. `v0`, `v1`): it points at the
     # latest patch of that major, which already triggered this workflow under
     # its exact tag (`v0.2.3`). Re-running here would try to re-publish a
@@ -47,7 +47,7 @@ jobs:
   docker:
     name: Docker image
     needs: resolve
-    runs-on: ubuntu-latest
+    runs-on: ferrlabs-k8s
     steps:
       - uses: actions/checkout@v6
       - uses: docker/setup-qemu-action@v3
@@ -74,14 +74,14 @@ jobs:
             org.opencontainers.image.version=${{ needs.resolve.outputs.version }}
             org.opencontainers.image.licenses=MPL-2.0
             org.opencontainers.image.revision=${{ github.sha }}
-          # Inline cache — cheap enough on a small binary, no separate registry.
+          # Inline cache â€” cheap enough on a small binary, no separate registry.
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   helm:
     name: Helm chart
     needs: [resolve, docker]
-    runs-on: ubuntu-latest
+    runs-on: ferrlabs-k8s
     steps:
       - uses: actions/checkout@v6
       - uses: azure/setup-helm@v4
@@ -91,8 +91,8 @@ jobs:
         run: |
           V="${{ needs.resolve.outputs.version }}"
           # `version` = chart version, `appVersion` = operator version.
-          # We keep them in lock-step — one release cuts both.
-          # Quote both fields — helm lint rejects `version: 0` / `version: 1.0`
+          # We keep them in lock-step â€” one release cuts both.
+          # Quote both fields â€” helm lint rejects `version: 0` / `version: 1.0`
           # because unquoted they parse as int/float and the schema requires a
           # string.
           sed -i -E "s/^version: .*/version: \"$V\"/" charts/ferrflow-operator/Chart.yaml
