@@ -7,10 +7,21 @@ if [ ! -f go.mod ]; then
 fi
 
 echo "==> gofmt -l ."
-DIFF=$(gofmt -l .)
-if [ -n "$DIFF" ]; then
-  echo "Files need gofmt:"
-  echo "$DIFF"
+# Run gofmt against the index blob content (LF) rather than the working
+# tree, otherwise on Windows checkouts CRLF normalization triggers a
+# false positive on every file.
+HAS_DIFF=0
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  ORIG=$(git show ":$f" 2>/dev/null) || continue
+  FMT=$(printf '%s\n' "$ORIG" | gofmt) || continue
+  if [ "$ORIG" != "$FMT" ]; then
+    echo "  $f"
+    HAS_DIFF=1
+  fi
+done < <(git ls-files '*.go')
+if [ "$HAS_DIFF" = 1 ]; then
+  echo "Files need gofmt (run 'gofmt -w' on the listed paths)"
   exit 1
 fi
 
