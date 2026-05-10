@@ -1,9 +1,46 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if command -v make >/dev/null 2>&1 && grep -qE '^test:' Makefile; then
-  make test
-else
-  echo "==> go test"
-  go test ./...
+if [ ! -f go.mod ]; then
+  echo "no go.mod — skipping pre-push checks"
+  exit 0
 fi
+
+echo "==> gofmt -l ."
+# Run gofmt against the index blob content (LF) rather than the working
+# tree, otherwise on Windows checkouts CRLF normalization triggers a
+# false positive on every file.
+HAS_DIFF=0
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  ORIG=$(git show ":$f" 2>/dev/null) || continue
+  FMT=$(printf '%s\n' "$ORIG" | gofmt) || continue
+  if [ "$ORIG" != "$FMT" ]; then
+    echo "  $f"
+    HAS_DIFF=1
+  fi
+done < <(git ls-files '*.go')
+if [ "$HAS_DIFF" = 1 ]; then
+  echo "Files need gofmt (run 'gofmt -w' on the listed paths)"
+  exit 1
+fi
+
+echo "==> go vet ./..."
+go vet ./...
+
+if command -v golangci-lint >/dev/null 2>&1; then
+  echo "==> golangci-lint run"
+  golangci-lint run
+else
+  echo "(golangci-lint not installed — skipping; CI will run it)"
+fi
+
+echo "==> go test ./..."
+if [ "${CGO_ENABLED:-1}" = "0" ] || ! command -v cc >/dev/null 2>&1 && ! command -v gcc >/dev/null 2>&1; then
+  go test ./...
+else
+  go test -race ./...
+fi
+
+echo "==> go build ./cmd/..."
+go build -o /dev/null ./cmd/...

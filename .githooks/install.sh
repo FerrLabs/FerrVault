@@ -4,4 +4,4 @@ git config core.hooksPath .githooks
 chmod +x .githooks/pre-commit .githooks/pre-push 2>/dev/null || true
 echo "Git hooks installed (core.hooksPath=.githooks)."
 echo "pre-commit: gofmt + go vet"
-echo "pre-push:   go test ./..."
+echo "pre-push:   gofmt + go vet + golangci-lint (if installed) + go test -race + go build"
