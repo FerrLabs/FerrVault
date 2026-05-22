@@ -1,0 +1,10 @@
+[workspace]
+resolver = "2"
+members = ["cli"]
+
+[workspace.package]
+license = "MPL-2.0"
+edition = "2024"
+rust-version = "1.88"
+authors = ["FerrLabs"]
+repository = "https://github.com/FerrLabs/FerrVault"
