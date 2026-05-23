@@ -51,6 +51,16 @@ spec:
               type: object
               required: [url, organization, tokenSecretRef]
               properties:
+                mode:
+                  type: string
+                  enum: [ferrflow, ferrvault]
+                  default: ferrflow
+                  description: |
+                    Backend API the operator talks to. `ferrflow` (default) targets the
+                    legacy `orgs/{org}/projects/{project}/vaults/by-name/{vault}` shape on
+                    FerrLabs-Cloud. `ferrvault` targets the new FerrVault SaaS
+                    `/v1/operator/secrets/reveal` endpoint and ignores `organization` +
+                    each `FerrFlowSecret.spec.project` — the SAT token scopes the call.
                 url:
                   type: string
                   pattern: '^https?://'

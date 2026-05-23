@@ -255,3 +255,62 @@ func TestProbe_RetriesOn5xx(t *testing.T) {
 		t.Fatalf("expected 2 calls, got %d", got)
 	}
 }
+
+func TestRevealFromVault_PostsBodyAndMapsHits(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+		if r.URL.Path != "/v1/operator/secrets/reveal" {
+			t.Errorf("expected /v1/operator/secrets/reveal, got %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Content-Type"); got != "application/json" {
+			t.Errorf("expected Content-Type application/json, got %q", got)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer fft_test" {
+			t.Errorf("missing or wrong Authorization header: %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"hits":[{"name":"DATABASE_URL","value":"postgres://u:p@h/db","version":3,"fetched_at":"2026-05-23T08:00:00Z"},{"name":"JWT_SECRET","value":"deadbeef","version":1,"fetched_at":"2026-05-23T08:00:00Z"}],"missing":["MISSING_KEY"]}`))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL, fastPolicy())
+	resp, err := c.RevealFromVault(context.Background(), "production", []string{"DATABASE_URL", "JWT_SECRET", "MISSING_KEY"})
+	if err != nil {
+		t.Fatalf("RevealFromVault: %v", err)
+	}
+	if got := resp.Secrets["DATABASE_URL"]; got != "postgres://u:p@h/db" {
+		t.Errorf("DATABASE_URL mismatch: %q", got)
+	}
+	if got := resp.Secrets["JWT_SECRET"]; got != "deadbeef" {
+		t.Errorf("JWT_SECRET mismatch: %q", got)
+	}
+	if len(resp.Missing) != 1 || resp.Missing[0] != "MISSING_KEY" {
+		t.Errorf("missing slice mismatch: %v", resp.Missing)
+	}
+	if resp.Vault.Name != "production" {
+		t.Errorf("expected echoed vault name, got %q", resp.Vault.Name)
+	}
+}
+
+func TestRevealFromVault_403ReturnsAuthError(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"message":"wrong vault"}`))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL, fastPolicy())
+	_, err := c.RevealFromVault(context.Background(), "production", nil)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	var authErr *AuthError
+	if !errors.As(err, &authErr) || authErr.Kind != AuthForbidden {
+		t.Errorf("expected AuthForbidden, got %T %v", err, err)
+	}
+}

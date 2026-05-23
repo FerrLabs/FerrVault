@@ -288,6 +288,97 @@ func (c *Client) BulkReveal(
 	return &out, nil
 }
 
+// vaultRevealRequest is the JSON body for FerrVault's POST
+// `/v1/operator/secrets/reveal`. `names` is optional — omit it to pull every
+// secret the SAT can see in the named vault.
+type vaultRevealRequest struct {
+	Vault string   `json:"vault"`
+	Names []string `json:"names,omitempty"`
+}
+
+// vaultRevealHit mirrors `BulkReadHit` on the server side.
+type vaultRevealHit struct {
+	Name      string `json:"name"`
+	Value     string `json:"value"`
+	Version   int    `json:"version"`
+	FetchedAt string `json:"fetched_at"`
+}
+
+type vaultRevealResponse struct {
+	Hits    []vaultRevealHit `json:"hits"`
+	Missing []string         `json:"missing"`
+}
+
+// RevealFromVault fetches `names` from the named FerrVault vault via the new
+// `POST /v1/operator/secrets/reveal` endpoint. `names` is optional — pass an
+// empty slice to pull every secret the SAT can see. The token is interpreted
+// as a SAT (`sat_…`) and bound server-side to a specific vault; `vault` here
+// must match the SAT's vault scope or the API responds 403.
+//
+// The result is mapped onto `BulkRevealResponse` so the controller can stay
+// agnostic of which backend served the request. `Vault` is left zero-valued
+// because FerrVault SaaS doesn't echo a vault summary on this endpoint;
+// callers that need it can fetch it separately via `/v1/operator/me`.
+func (c *Client) RevealFromVault(
+	ctx context.Context,
+	vault string,
+	names []string,
+) (*BulkRevealResponse, error) {
+	u := *c.baseURL
+	u.Path = strings.TrimRight(u.Path, "/") + "/v1/operator/secrets/reveal"
+
+	bodyBytes, err := json.Marshal(vaultRevealRequest{Vault: vault, Names: names})
+	if err != nil {
+		return nil, fmt.Errorf("ferrflow: encode reveal body: %w", err)
+	}
+
+	var raw vaultRevealResponse
+	_, err = c.doWithRetry(ctx, func() (*http.Response, error) {
+		req, err := http.NewRequestWithContext(
+			ctx, http.MethodPost, u.String(), bytes.NewReader(bodyBytes),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("ferrflow: build request: %w", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+c.token)
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Content-Type", "application/json")
+		return c.http.Do(req)
+	}, func(resp *http.Response, body []byte) error {
+		switch resp.StatusCode {
+		case http.StatusOK:
+			if err := json.Unmarshal(body, &raw); err != nil {
+				return fmt.Errorf("ferrflow: decode response: %w", err)
+			}
+			return nil
+		case http.StatusUnauthorized:
+			return &AuthError{Kind: AuthUnauthorized, Message: errorMessage(body, "unauthorized")}
+		case http.StatusForbidden:
+			return &AuthError{Kind: AuthForbidden, Message: errorMessage(body, "forbidden")}
+		case http.StatusNotFound:
+			return &NotFoundError{Message: errorMessage(body, "not found")}
+		default:
+			return &APIError{
+				Status:  resp.StatusCode,
+				Message: errorMessage(body, http.StatusText(resp.StatusCode)),
+			}
+		}
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	out := &BulkRevealResponse{
+		Secrets: make(map[string]string, len(raw.Hits)),
+		Missing: raw.Missing,
+		Vault:   VaultSummary{Name: vault},
+	}
+	for _, h := range raw.Hits {
+		out.Secrets[h.Name] = h.Value
+	}
+	return out, nil
+}
+
 // doWithRetry runs `send` under the configured retry policy, handing the raw
 // response and body to `classify`. `classify` returns nil on success, or a
 // typed error; 5xx `APIError`s and `TransportError`s are treated as retriable,
