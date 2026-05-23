@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	fvv1alpha1 "github.com/FerrLabs/FerrFlow-Operator/api/ferrvault/v1alpha1"
 	ffv1alpha1 "github.com/FerrLabs/FerrFlow-Operator/api/v1alpha1"
 	"github.com/FerrLabs/FerrFlow-Operator/internal/controller"
 )
@@ -32,6 +33,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(ffv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(fvv1alpha1.AddToScheme(scheme))
 }
 
 func main() {
@@ -98,6 +100,23 @@ func main() {
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "FerrFlowConnection")
+		os.Exit(1)
+	}
+
+	if err := (&controller.FerrVaultSecretReconciler{
+		Client:                 mgr.GetClient(),
+		Scheme:                 mgr.GetScheme(),
+		DefaultRefreshInterval: defaultRefreshInterval,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "FerrVaultSecret")
+		os.Exit(1)
+	}
+
+	if err := (&controller.FerrVaultConnectionReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "FerrVaultConnection")
 		os.Exit(1)
 	}
 

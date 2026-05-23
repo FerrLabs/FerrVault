@@ -1,0 +1,20 @@
+apiVersion: ferrvault.io/v1alpha1
+kind: FerrVaultConnection
+metadata:
+  name: ferrvault-prod
+  namespace: my-app
+spec:
+  url: https://ferrvault.com
+  organization: my-org
+  tokenSecretRef:
+    name: ferrvault-sat
+    key: token
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ferrvault-sat
+  namespace: my-app
+type: Opaque
+stringData:
+  token: sat_REPLACE_ME_WITH_VALUE_FROM_FERRVAULT_UI
