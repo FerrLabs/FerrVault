@@ -10,7 +10,10 @@ import (
 // reconciler actually uses. Scoped down so tests can inject a fake without
 // needing to stand up a real HTTP server.
 type ferrflowClient interface {
+	// BulkReveal — legacy FerrLabs-Cloud reveal endpoint.
 	BulkReveal(ctx context.Context, org, project, vault, namespace string, names []string) (*ferrflow.BulkRevealResponse, error)
+	// RevealFromVault — new FerrVault SaaS reveal endpoint (Mode=ferrvault).
+	RevealFromVault(ctx context.Context, vault string, names []string) (*ferrflow.BulkRevealResponse, error)
 }
 
 // ClientFactory builds a ferrflowClient for a given base URL and token. Swapped

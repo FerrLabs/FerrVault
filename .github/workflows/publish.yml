@@ -21,7 +21,7 @@ permissions:
 jobs:
   resolve:
     name: Resolve version
-    runs-on: ubuntu-latest
+    runs-on: ferrlabs-k8s
     # Skip the rolling major-only tag (e.g. `v0`, `v1`): it points at the
     # latest patch of that major, which already triggered this workflow under
     # its exact tag (`v0.2.3`). Re-running here would try to re-publish a
@@ -47,7 +47,7 @@ jobs:
   docker:
     name: Docker image
     needs: resolve
-    runs-on: ubuntu-latest
+    runs-on: ferrlabs-k8s
     steps:
       - uses: actions/checkout@v6
       - uses: docker/setup-qemu-action@v3
@@ -81,7 +81,7 @@ jobs:
   helm:
     name: Helm chart
     needs: [resolve, docker]
-    runs-on: ubuntu-latest
+    runs-on: ferrlabs-k8s
     steps:
       - uses: actions/checkout@v6
       - uses: azure/setup-helm@v4

@@ -21,11 +21,12 @@ import (
 )
 
 // fakeFerrFlow is a test double for ferrflowClient. Each test sets bulkReveal
-// to shape the reveal call's response or error.
+// or revealFromVault to shape the response or error.
 type fakeFerrFlow struct {
-	bulkReveal func(ctx context.Context, org, project, vault, namespace string, names []string) (*ferrflow.BulkRevealResponse, error)
-	// calls is incremented on every invocation so tests can assert the
-	// reconciler hit the client at all (or didn't).
+	bulkReveal      func(ctx context.Context, org, project, vault, namespace string, names []string) (*ferrflow.BulkRevealResponse, error)
+	revealFromVault func(ctx context.Context, vault string, names []string) (*ferrflow.BulkRevealResponse, error)
+	// calls is incremented on every invocation (of either method) so tests
+	// can assert the reconciler hit the client at all (or didn't).
 	calls int
 }
 
@@ -39,6 +40,18 @@ func (f *fakeFerrFlow) BulkReveal(
 		return &ferrflow.BulkRevealResponse{Secrets: map[string]string{}}, nil
 	}
 	return f.bulkReveal(ctx, org, project, vault, namespace, names)
+}
+
+func (f *fakeFerrFlow) RevealFromVault(
+	ctx context.Context,
+	vault string,
+	names []string,
+) (*ferrflow.BulkRevealResponse, error) {
+	f.calls++
+	if f.revealFromVault == nil {
+		return &ferrflow.BulkRevealResponse{Secrets: map[string]string{}}, nil
+	}
+	return f.revealFromVault(ctx, vault, names)
 }
 
 const (
@@ -253,6 +266,53 @@ func TestReconcile_HappyPath(t *testing.T) {
 	}
 	if cr.Status.ObservedGeneration != cr.Generation {
 		t.Fatalf("ObservedGeneration = %d, want %d", cr.Status.ObservedGeneration, cr.Generation)
+	}
+}
+
+func TestReconcile_FerrVaultMode_CallsRevealFromVault(t *testing.T) {
+	cr := baseCR()
+	conn := baseConn()
+	conn.Spec.Mode = ffv1alpha1.ModeFerrVault
+	tok := baseTokenSecret()
+
+	var bulkRevealCalls, revealFromVaultCalls int
+	var gotVault string
+	fakeFF := &fakeFerrFlow{
+		bulkReveal: func(_ context.Context, _, _, _, _ string, _ []string) (*ferrflow.BulkRevealResponse, error) {
+			bulkRevealCalls++
+			return &ferrflow.BulkRevealResponse{}, nil
+		},
+		revealFromVault: func(_ context.Context, vault string, _ []string) (*ferrflow.BulkRevealResponse, error) {
+			revealFromVaultCalls++
+			gotVault = vault
+			return &ferrflow.BulkRevealResponse{
+				Secrets: map[string]string{"K": "V"},
+			}, nil
+		},
+	}
+	r := newTestReconciler(t, []client.Object{cr, conn, tok}, fakeFF)
+
+	if _, err := reconcileOnce(t, r, cr); err != nil {
+		t.Fatalf("Reconcile returned error: %v", err)
+	}
+	if revealFromVaultCalls != 1 {
+		t.Fatalf("RevealFromVault called %d times, want 1", revealFromVaultCalls)
+	}
+	if bulkRevealCalls != 0 {
+		t.Fatalf("BulkReveal called %d times in ferrvault mode, want 0", bulkRevealCalls)
+	}
+	if gotVault != cr.Spec.Vault {
+		t.Fatalf("RevealFromVault vault = %q, want %q", gotVault, cr.Spec.Vault)
+	}
+
+	var got corev1.Secret
+	if err := r.Get(context.Background(), types.NamespacedName{
+		Namespace: testNamespace, Name: testTargetName,
+	}, &got); err != nil {
+		t.Fatalf("get target Secret: %v", err)
+	}
+	if got.StringData["K"] != "V" {
+		t.Fatalf("StringData[K] = %q, want %q", got.StringData["K"], "V")
 	}
 }
 

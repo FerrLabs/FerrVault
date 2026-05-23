@@ -14,6 +14,22 @@ import (
 // (long-lived token stored in a k8s Secret) or `oidc` (workload-identity
 // exchange — recommended, no long-lived secret at rest).
 type FerrFlowConnectionSpec struct {
+	// Mode selects which backend API the operator talks to:
+	//
+	//   - `ferrflow` (default, backward compatible) — legacy FerrLabs-Cloud
+	//     shape, vault addressed as `orgs/{org}/projects/{project}/vaults/by-name/{vault}`.
+	//     Auth via `tokenSecretRef` (`ffclust_…` / `fft_…`) or `oidc`.
+	//
+	//   - `ferrvault` — new FerrVault SaaS, flat `/v1/operator/secrets/reveal`
+	//     surface. Auth via a Service-Account Token (`sat_…`) bound to a
+	//     specific vault. `organization` is ignored; the `project` field on
+	//     each `FerrFlowSecret` is ignored too — the SAT scopes everything.
+	//
+	// +kubebuilder:validation:Enum=ferrflow;ferrvault
+	// +kubebuilder:default=ferrflow
+	// +optional
+	Mode string `json:"mode,omitempty"`
+
 	// URL is the base of the FerrFlow API — e.g. `https://ferrflow.example.com`.
 	// The operator appends `/api/v1/…` paths itself.
 	//
@@ -86,6 +102,21 @@ type OIDCAuth struct {
 // DefaultTokenPath is where kubelet mounts the projected SA token in our
 // sample Deployment. Exposed so both the controllers and the chart share
 // a single source of truth.
+// Backend mode literals for FerrFlowConnectionSpec.Mode.
+const (
+	ModeFerrFlow  = "ferrflow"
+	ModeFerrVault = "ferrvault"
+)
+
+// ResolvedMode returns the effective Mode for the connection, applying the
+// `ferrflow` default for empty values so callers don't have to repeat it.
+func (s FerrFlowConnectionSpec) ResolvedMode() string {
+	if s.Mode == "" {
+		return ModeFerrFlow
+	}
+	return s.Mode
+}
+
 const DefaultTokenPath = "/var/run/secrets/ferrflow/token"
 
 // DefaultAudience matches the FerrFlow API's `EXPECTED_AUDIENCE` constant.

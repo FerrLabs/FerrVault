@@ -161,19 +161,31 @@ func (r *FerrFlowSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return r.failReady(ctx, &cr, "InvalidConnection", err.Error())
 	}
 
-	// --- 3. Fetch the secrets from FerrFlow.
+	// --- 3. Fetch the secrets from the configured backend.
 	//
-	// The CR's own namespace is what the FerrFlow API uses to authorize
-	// cluster-identity callers (via `cluster_authorizations.namespace_name`).
-	// User-token callers ignore the header — safe to always send it.
-	reveal, err := ffc.BulkReveal(
-		ctx,
-		conn.Spec.Organization,
-		cr.Spec.Project,
-		cr.Spec.Vault,
-		cr.Namespace,
-		cr.Spec.Selector.Names,
-	)
+	// `ferrflow` mode (default) hits the legacy FerrLabs-Cloud reveal endpoint
+	// addressed by `orgs/{org}/projects/{project}/vaults/by-name/{vault}` and
+	// authorizes cluster-identity callers via the `X-FerrFlow-Namespace`
+	// header (user-token callers ignore it — safe to always send).
+	//
+	// `ferrvault` mode hits the new FerrVault SaaS endpoint at
+	// `/v1/operator/secrets/reveal`. The SAT token already scopes the request
+	// to a specific vault, so `organization` / `project` are not part of the
+	// path — the controller just passes `vault` + the optional names list.
+	var reveal *ferrflow.BulkRevealResponse
+	switch conn.Spec.ResolvedMode() {
+	case ffv1alpha1.ModeFerrVault:
+		reveal, err = ffc.RevealFromVault(ctx, cr.Spec.Vault, cr.Spec.Selector.Names)
+	default:
+		reveal, err = ffc.BulkReveal(
+			ctx,
+			conn.Spec.Organization,
+			cr.Spec.Project,
+			cr.Spec.Vault,
+			cr.Namespace,
+			cr.Spec.Selector.Names,
+		)
+	}
 	if err != nil {
 		// 401/403 are terminal until the user fixes their token — longer backoff.
 		if ferrflow.IsAuthError(err) {

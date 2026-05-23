@@ -12,5 +12,6 @@ jobs:
     name: CI
     uses: FerrLabs/.github/.github/workflows/reusable-ci-go.yml@main
     with:
+      runner: ferrlabs-k8s
       build-paths: ./cmd/...
     secrets: inherit
