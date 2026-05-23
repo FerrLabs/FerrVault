@@ -18,7 +18,7 @@ permissions:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
-    runs-on: ubuntu-latest
+    runs-on: ferrlabs-k8s
     # Skip on release-bot commits to avoid re-scanning identical code twice in
     # a row (the release commit is a one-line changelog diff).
     if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release):')

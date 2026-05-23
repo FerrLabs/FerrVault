@@ -19,7 +19,7 @@ jobs:
     name: Release with FerrFlow
     # Skip release commits to avoid self-triggering loops.
     if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release):')
-    runs-on: ubuntu-latest
+    runs-on: ferrlabs-k8s
     concurrency:
       group: release-${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: false
