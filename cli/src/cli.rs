@@ -80,6 +80,26 @@ pub enum Command {
         #[arg(trailing_var_arg = true, required = true)]
         argv: Vec<String>,
     },
+    Set {
+        name: String,
+
+        value: Option<String>,
+
+        #[arg(long, conflicts_with = "value")]
+        stdin: bool,
+
+        #[arg(long, conflicts_with_all = ["value", "stdin"])]
+        from_file: Option<PathBuf>,
+
+        #[arg(long)]
+        update: bool,
+    },
+    Delete {
+        name: String,
+
+        #[arg(long, short)]
+        yes: bool,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]

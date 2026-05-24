@@ -100,6 +100,73 @@ impl ApiClient {
         handle(resp).await
     }
 
+    pub async fn create_secret(
+        &self,
+        vault: &str,
+        name: &str,
+        value: &str,
+    ) -> Result<serde_json::Value> {
+        let url = self
+            .cfg
+            .base_url
+            .join("/v1/operator/secrets")
+            .context("constructing create URL")?;
+        let body = serde_json::json!({ "vault": vault, "name": name, "value": value });
+        let resp = self
+            .http
+            .post(url)
+            .bearer_auth(self.cfg.token.as_str())
+            .json(&body)
+            .send()
+            .await
+            .context("POST /v1/operator/secrets")?;
+        handle(resp).await
+    }
+
+    pub async fn update_secret(
+        &self,
+        vault: &str,
+        name: &str,
+        value: &str,
+    ) -> Result<serde_json::Value> {
+        let url = self
+            .cfg
+            .base_url
+            .join(&format!("/v1/operator/secrets/{name}"))
+            .with_context(|| format!("constructing update URL for {name}"))?;
+        let body = serde_json::json!({ "vault": vault, "value": value });
+        let resp = self
+            .http
+            .put(url)
+            .bearer_auth(self.cfg.token.as_str())
+            .json(&body)
+            .send()
+            .await
+            .with_context(|| format!("PUT /v1/operator/secrets/{name}"))?;
+        handle(resp).await
+    }
+
+    pub async fn delete_secret(&self, vault: &str, name: &str) -> Result<()> {
+        let mut url = self
+            .cfg
+            .base_url
+            .join(&format!("/v1/operator/secrets/{name}"))
+            .with_context(|| format!("constructing delete URL for {name}"))?;
+        url.query_pairs_mut().append_pair("vault", vault);
+        let resp = self
+            .http
+            .delete(url)
+            .bearer_auth(self.cfg.token.as_str())
+            .send()
+            .await
+            .with_context(|| format!("DELETE /v1/operator/secrets/{name}"))?;
+        let status = resp.status();
+        if status.is_success() {
+            return Ok(());
+        }
+        handle::<serde_json::Value>(resp).await.map(|_| ())
+    }
+
     async fn get_json<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T> {
         let url = self
             .cfg

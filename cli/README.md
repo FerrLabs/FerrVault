@@ -36,6 +36,8 @@ storing anything, so a typo fails loudly instead of silently.
 | `ferrvault get --all`         | Print every secret (with `--format env/dotenv/json`).       |
 | `ferrvault get --names A,B,C` | Fetch a subset.                                             |
 | `ferrvault exec -- CMD ...`   | Run `CMD` with every secret injected as env var; never writes to disk. |
+| `ferrvault set NAME VALUE`    | Create a secret. `--stdin` reads from stdin, `--from-file <path>` reads from a file, `--update` rotates an existing secret instead of erroring. Requires SAT role ≥ Writer. |
+| `ferrvault delete NAME`       | Soft-delete a secret (versions are kept). Asks for typed confirmation unless `--yes` is passed. Requires SAT role ≥ Writer. |
 
 ## Security flags
 

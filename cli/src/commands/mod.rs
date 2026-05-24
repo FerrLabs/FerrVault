@@ -6,11 +6,13 @@ use crate::api::{ApiClient, ApiConfig, TlsArgs};
 use crate::cli::{Cli, Command};
 use crate::storage::CredentialStore;
 
+mod delete;
 mod exec;
 mod get;
 mod list;
 mod login;
 mod logout;
+mod set;
 mod whoami;
 
 pub async fn dispatch(cli: Cli) -> Result<()> {
@@ -38,6 +40,14 @@ pub async fn dispatch(cli: Cli) -> Result<()> {
             only,
             argv,
         } => exec::run(&client, names, all, only, argv).await,
+        Command::Set {
+            name,
+            value,
+            stdin,
+            from_file,
+            update,
+        } => set::run(&client, name, value, stdin, from_file, update).await,
+        Command::Delete { name, yes } => delete::run(&client, name, yes).await,
     }
 }
 
