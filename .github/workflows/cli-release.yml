@@ -1,0 +1,77 @@
+name: cli-release
+
+on:
+  push:
+    tags:
+      - 'cli-v[0-9]+.[0-9]+.[0-9]+'
+      - 'cli-v[0-9]+.[0-9]+.[0-9]+-*'
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  create-release:
+    name: Create GitHub release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: taiki-e/create-gh-release-action@v1
+        with:
+          prefix: cli
+          title: ferrvault CLI $version
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  upload:
+    name: Build and upload (${{ matrix.short }})
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            short: linux-amd64
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            short: linux-arm64
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            short: darwin-amd64
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            short: darwin-arm64
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            short: windows-amd64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Linux deps for keyring
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+              build-essential pkg-config libdbus-1-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.88'
+          targets: ${{ matrix.target }}
+      - uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          bin: ferrvault
+          target: ${{ matrix.target }}
+          archive: ferrvault-${{ matrix.short }}
+          checksum: sha256
+          tar: unix
+          zip: windows
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Attest binary provenance (SLSA)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: target/${{ matrix.target }}/release/ferrvault
