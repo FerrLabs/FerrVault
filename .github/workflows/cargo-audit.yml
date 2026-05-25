@@ -30,6 +30,10 @@ jobs:
       issues: write
     steps:
       - uses: actions/checkout@v6
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.88'
       - name: Run cargo-audit
         uses: rustsec/audit-check@v2
         with:
