@@ -17,7 +17,7 @@ env:
 jobs:
   create-release:
     name: Create GitHub release
-    runs-on: ubuntu-latest
+    runs-on: ferrlabs-k8s
     steps:
       - uses: actions/checkout@v6
       - uses: taiki-e/create-gh-release-action@v1
@@ -34,10 +34,10 @@ jobs:
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
+            os: ferrlabs-k8s
             short: linux-amd64
           - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
+            os: ferrlabs-k8s
             short: linux-arm64
           - target: x86_64-apple-darwin
             os: macos-latest
