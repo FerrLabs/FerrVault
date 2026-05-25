@@ -22,7 +22,7 @@ on:
 jobs:
   rust:
     name: Check CLI
-    runs-on: ubuntu-latest
+    runs-on: ferrlabs-k8s
     steps:
       - uses: actions/checkout@v6
       - name: Install Linux deps for keyring

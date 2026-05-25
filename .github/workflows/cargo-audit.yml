@@ -24,7 +24,7 @@ on:
 jobs:
   audit:
     name: RUSTSEC audit
-    runs-on: ubuntu-latest
+    runs-on: ferrlabs-k8s
     permissions:
       contents: read
       issues: write
