@@ -80,9 +80,18 @@ fn resolve_token(flag: Option<&str>) -> Result<Zeroizing<String>> {
     })
 }
 
+const INSECURE_GATE_ENV: &str = "FERRVAULT_INSECURE_I_KNOW_WHAT_I_AM_DOING";
+
 fn build_client(cli: &Cli) -> Result<ApiClient> {
     let url = resolve_url(cli.api_url.as_deref())?;
     let token = resolve_token(cli.token.as_deref())?;
+    if cli.insecure_skip_verify && std::env::var(INSECURE_GATE_ENV).as_deref() != Ok("yes") {
+        return Err(anyhow!(
+            "--insecure-skip-verify refuses to run without {INSECURE_GATE_ENV}=yes in env. \
+             This is a secrets CLI; if you really mean to skip TLS validation, set the env \
+             var explicitly so a forgotten dev flag can't leak a SAT over an MITM."
+        ));
+    }
     let tls = TlsArgs {
         ca_cert: cli.ca_cert.as_deref(),
         client_cert: cli.client_cert.as_deref(),

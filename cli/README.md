@@ -46,7 +46,7 @@ storing anything, so a typo fails loudly instead of silently.
 | `--ca-cert PATH`              | Add a CA cert (PEM) to the trust store. For private deployments.       |
 | `--client-cert` / `--client-key` | mTLS — client certificate + key (PEM).                              |
 | `--pin-sha256 HEX|BASE64`     | Pin the server certificate by SHA-256 of any cert in the chain.        |
-| `--insecure-skip-verify`      | Skip TLS validation. Prints a warning. **Never use in production.**    |
+| `--insecure-skip-verify`      | Skip TLS validation. Requires `FERRVAULT_INSECURE_I_KNOW_WHAT_I_AM_DOING=yes` in env (belt-and-suspenders so a forgotten dev flag can't leak a SAT). **Never use in production.** |
 
 Every flag has a matching `FERRVAULT_*` environment variable. See
 `ferrvault --help` for the full list.

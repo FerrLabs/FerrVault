@@ -32,6 +32,7 @@ chrono = { version = "0.4", default-features = false, features = ["serde", "cloc
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 hostname = "0.4"
+rpassword = "7"
 
 [dev-dependencies]
 tempfile = "3"

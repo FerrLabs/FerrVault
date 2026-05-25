@@ -46,7 +46,7 @@ Boundary (b): the network between the CLI and the FerrVault API.
 | Threat | Mitigation | Status |
 | --- | --- | --- |
 | Token written to a plain file under `~/.config` or similar | Token stored in OS keyring only (Windows DPAPI, macOS Keychain, Secret Service on Linux). No fallback to disk. | ✅ |
-| Token written to shell history via `--token` flag | `--token` is supported but discouraged; CLI prompts on stdin when missing. README + `--help` flag it. | ✅ |
+| Token written to shell history via `--token` flag | `--token` is supported but discouraged; CLI prompts on stdin when missing. When stdin is a tty, `login` uses `rpassword` for real input masking. README + `--help` flag it. | ✅ |
 | Token logged by accident at `info` level | `tracing_subscriber` default filter is `warn`; the token is held in `Zeroizing<String>` and never formatted by `Debug` impls. | ✅ |
 | Token surviving in a swapped memory page after process exit | `zeroize::Zeroizing<String>` clears the heap allocation on drop. Stack copies in `reqwest` internals are out of our control. | ⚠ partial |
 
@@ -59,6 +59,7 @@ Boundary (b): the network between the CLI and the FerrVault API.
 | Compromised CA in the system trust store | `FERRVAULT_PIN_SHA256` enforces a SHA-256 pin on any cert in the server chain (leaf, intermediate, or root). Mismatch = handshake aborts before the bearer is sent. | ✅ |
 | Misconfigured private CA needed | `--ca-cert path.pem` extends the trust store; pin still applies if set. | ✅ |
 | Stolen client cert (mTLS) | `--client-cert` + `--client-key` supported; key file must be 0600. Treat client keys with the same care as tokens. | ✅ |
+| Forgotten `--insecure-skip-verify` in a script | Flag refuses to take effect unless `FERRVAULT_INSECURE_I_KNOW_WHAT_I_AM_DOING=yes` is also in env. A dev who used it locally and forgot to remove it gets a hard error in CI, not a silent MITM-able session. | ✅ |
 | Token leaked via verbose proxy logging | The CLI sends `Authorization: Bearer fvsat_...` in headers only, never in URLs. | ✅ |
 
 ### T3 — leak of decrypted values

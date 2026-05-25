@@ -1,4 +1,4 @@
-use std::io::{BufRead, IsTerminal, Write};
+use std::io::{BufRead, IsTerminal};
 
 use anyhow::{Context, Result, anyhow};
 use reqwest::Url;
@@ -67,8 +67,12 @@ pub async fn run(
 fn prompt_token() -> Result<Zeroizing<String>> {
     let stdin = std::io::stdin();
     if stdin.is_terminal() {
-        eprint!("ferrvault token (input hidden if your terminal supports it): ");
-        std::io::stderr().flush().ok();
+        let raw = rpassword::prompt_password("ferrvault token: ").context("reading token")?;
+        let trimmed = raw.trim().to_owned();
+        if trimmed.is_empty() {
+            return Err(anyhow!("empty token"));
+        }
+        return Ok(Zeroizing::new(trimmed));
     }
     let mut line = String::new();
     stdin.lock().read_line(&mut line).context("reading token")?;
