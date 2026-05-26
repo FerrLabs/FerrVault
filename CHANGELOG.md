@@ -4,6 +4,20 @@ All notable changes to `ferrflow-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [1.1.0] - 2026-05-26
+
+### Features
+
+- feat(cli): introduce ferrvault consumer CLI + GitHub Action (#89)
+- feat: wire operator against FerrVault SaaS via mode=ferrvault (#92)
+
+### Bug Fixes
+
+- fix(deps): update kubernetes monorepo to v0.36.0 (#65)
+- fix(deps): update module sigs.k8s.io/controller-runtime to v0.23.3 (#62)
+- fix(deps): update module github.com/prometheus/client_golang to v1.23.2 (#61)
+- fix(deps): update kubernetes monorepo to v0.35.4 (#60)
+
 ## [1.0.1] - 2026-04-21
 
 ### Bug Fixes
