@@ -79,7 +79,15 @@ runs:
           *) echo "::error::unsupported arch $arch"; exit 1 ;;
         esac
         if [[ "$VERSION" == "latest" ]]; then
-          VERSION="$(curl -fsSL https://api.github.com/repos/FerrLabs/FerrVault/releases/latest | jq -r '.tag_name')"
+          # /releases/latest returns the single most-recent release across
+          # all tag prefixes — in this repo the operator (v*) and the CLI
+          # (cli-v*) cohabit, so we filter the paginated list explicitly.
+          VERSION="$(curl -fsSL 'https://api.github.com/repos/FerrLabs/FerrVault/releases?per_page=30' \
+            | jq -r 'map(select(.tag_name | startswith("cli-v"))) | .[0].tag_name')"
+          if [[ -z "$VERSION" || "$VERSION" == "null" ]]; then
+            echo "::error::no cli-v* release found on FerrLabs/FerrVault — pin cli-version explicitly" >&2
+            exit 1
+          fi
         fi
         url="https://github.com/FerrLabs/FerrVault/releases/download/${VERSION}/ferrvault-${os}-${arch}.tar.gz"
         echo "Downloading $url"
