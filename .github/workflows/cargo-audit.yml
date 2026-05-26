@@ -1,0 +1,38 @@
+name: cargo-audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cli/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/cargo-audit.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'cli/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/cargo-audit.yml'
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: RUSTSEC audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Rust toolchain (1.89, satisfies cargo-audit's smol_str transitive dep)
+        uses: dtolnay/rust-toolchain@1.89.0
+      - name: Install cargo-audit (locked, avoids transitive MSRV churn)
+        run: cargo +1.89.0 install --locked cargo-audit
+      - name: Run cargo audit
+        run: cargo +1.89.0 audit

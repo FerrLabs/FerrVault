@@ -1,0 +1,137 @@
+name: 'FerrVault — fetch secrets'
+description: 'Fetch secrets from FerrVault and inject them into the workflow as masked outputs or environment variables.'
+author: 'FerrLabs'
+branding:
+  icon: 'lock'
+  color: 'green'
+
+inputs:
+  api-url:
+    description: 'FerrVault API base URL, e.g. https://api.ferrvault.example.com'
+    required: true
+  token:
+    description: 'FerrVault service-account token (fvsat_...). Pass via ${{ secrets.FERRVAULT_TOKEN }} — never inline.'
+    required: true
+  names:
+    description: 'Comma- or newline-separated list of secret names. Omit (with all: true) to fetch every secret in the vault.'
+    required: false
+    default: ''
+  all:
+    description: 'Fetch every secret in the vault. Mutually exclusive with names.'
+    required: false
+    default: 'false'
+  export-env:
+    description: 'When true, export each fetched secret as a workflow environment variable (visible to subsequent steps). Always masked.'
+    required: false
+    default: 'true'
+  output-prefix:
+    description: 'Prefix to prepend to each exported environment variable, e.g. APP_ → APP_DATABASE_URL.'
+    required: false
+    default: ''
+  ca-cert:
+    description: 'Path to an additional CA certificate (PEM). Useful for private deployments behind a custom CA.'
+    required: false
+    default: ''
+  pin-sha256:
+    description: 'SHA-256 pin against any certificate in the server chain (hex or base64). Mismatch aborts the handshake.'
+    required: false
+    default: ''
+  cli-version:
+    description: 'ferrvault CLI version to install. Defaults to the version that ships with this action revision.'
+    required: false
+    default: 'latest'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Validate inputs
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [[ -z "${{ inputs.token }}" ]]; then
+          echo "::error::token is required" >&2
+          exit 1
+        fi
+        case "${{ inputs.token }}" in
+          fvsat_*) ;;
+          *) echo "::error::token does not start with fvsat_ — refusing to send a non-FerrVault token" >&2; exit 1;;
+        esac
+        if [[ "${{ inputs.all }}" == "true" && -n "${{ inputs.names }}" ]]; then
+          echo "::error::all and names are mutually exclusive" >&2
+          exit 1
+        fi
+        if [[ "${{ inputs.all }}" != "true" && -z "${{ inputs.names }}" ]]; then
+          echo "::error::either all=true or names=A,B,C is required" >&2
+          exit 1
+        fi
+
+    - name: Install ferrvault CLI
+      shell: bash
+      env:
+        VERSION: ${{ inputs.cli-version }}
+      run: |
+        set -euo pipefail
+        os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+        arch="$(uname -m)"
+        case "$arch" in
+          x86_64|amd64) arch=amd64 ;;
+          aarch64|arm64) arch=arm64 ;;
+          *) echo "::error::unsupported arch $arch"; exit 1 ;;
+        esac
+        if [[ "$VERSION" == "latest" ]]; then
+          VERSION="$(curl -fsSL https://api.github.com/repos/FerrLabs/FerrVault/releases/latest | jq -r '.tag_name')"
+        fi
+        url="https://github.com/FerrLabs/FerrVault/releases/download/${VERSION}/ferrvault-${os}-${arch}.tar.gz"
+        echo "Downloading $url"
+        curl -fsSLo /tmp/fv.tgz "$url"
+        tar -xzf /tmp/fv.tgz -C /tmp
+        sudo install -m 0755 /tmp/ferrvault /usr/local/bin/ferrvault
+        ferrvault --version
+
+    - name: Fetch secrets
+      id: fetch
+      shell: bash
+      env:
+        FERRVAULT_URL: ${{ inputs.api-url }}
+        FERRVAULT_TOKEN: ${{ inputs.token }}
+        FERRVAULT_CA_CERT: ${{ inputs.ca-cert }}
+        FERRVAULT_PIN_SHA256: ${{ inputs.pin-sha256 }}
+        FETCH_ALL: ${{ inputs.all }}
+        NAMES_INPUT: ${{ inputs.names }}
+        EXPORT_ENV: ${{ inputs.export-env }}
+        OUTPUT_PREFIX: ${{ inputs.output-prefix }}
+      run: |
+        set -euo pipefail
+        umask 077
+        out="$(mktemp)"
+        trap 'shred -u "$out" 2>/dev/null || rm -f "$out"' EXIT
+
+        if [[ "$FETCH_ALL" == "true" ]]; then
+          ferrvault get --all --format json > "$out"
+        else
+          names="$(printf '%s' "$NAMES_INPUT" | tr '\n,' ',,' | tr -s ',' | sed 's/^,//;s/,$//')"
+          ferrvault get --names "$names" --format json > "$out"
+        fi
+
+        keys=$(jq -r 'keys[]' "$out")
+        for k in $keys; do
+          v="$(jq -r --arg k "$k" '.[$k]' "$out")"
+          echo "::add-mask::$v"
+          if [[ "$EXPORT_ENV" == "true" ]]; then
+            varname="${OUTPUT_PREFIX}${k}"
+            {
+              printf '%s<<FERRVAULT_EOF\n' "$varname"
+              printf '%s\n' "$v"
+              printf 'FERRVAULT_EOF\n'
+            } >> "$GITHUB_ENV"
+          fi
+        done
+
+        count=$(printf '%s\n' "$keys" | wc -l | tr -d ' ')
+        echo "count=$count" >> "$GITHUB_OUTPUT"
+        echo "ferrvault: injected $count secret(s) into the workflow (all masked)" >&2
+
+outputs:
+  count:
+    description: 'Number of secrets fetched.'
+    value: ${{ steps.fetch.outputs.count }}
