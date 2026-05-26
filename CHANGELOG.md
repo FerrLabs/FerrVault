@@ -4,6 +4,12 @@ All notable changes to `ferrflow-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [1.1.1] - 2026-05-26
+
+### Bug Fixes
+
+- fix(cli): linux-arm64 cross build via Cross.toml + action filters cli-v* tags (#102)
+
 ## [1.1.0] - 2026-05-26
 
 ### Features
