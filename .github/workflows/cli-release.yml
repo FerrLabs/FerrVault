@@ -36,23 +36,28 @@ jobs:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             short: linux-amd64
+            tool: cargo
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
             short: linux-arm64
+            tool: cross
           - target: x86_64-apple-darwin
             os: macos-latest
             short: darwin-amd64
+            tool: cargo
           - target: aarch64-apple-darwin
             os: macos-latest
             short: darwin-arm64
+            tool: cargo
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             short: windows-amd64
+            tool: cargo
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
-      - name: Install Linux deps for keyring
-        if: runner.os == 'Linux'
+      - name: Install Linux deps for keyring (native builds only — cross uses Cross.toml)
+        if: runner.os == 'Linux' && matrix.tool == 'cargo'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -65,6 +70,7 @@ jobs:
         with:
           bin: ferrvault
           target: ${{ matrix.target }}
+          tool: ${{ matrix.tool }}
           archive: ferrvault-${{ matrix.short }}
           checksum: sha256
           tar: unix
