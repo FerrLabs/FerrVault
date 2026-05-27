@@ -26,9 +26,9 @@ import (
 
 const (
 	fvSecretConnectionRefIndexKey = ".spec.connectionRef.name"
-	fvAnnotationContentHash       = "ferrvault.io/content-hash"
-	fvAnnotationRestartedAt       = "ferrvault.io/restarted-at"
-	fvSecretFinalizer             = "ferrvault.io/secret-cleanup"
+	fvAnnotationContentHash       = "ferrvault.com/content-hash"
+	fvAnnotationRestartedAt       = "ferrvault.com/restarted-at"
+	fvSecretFinalizer             = "ferrvault.com/secret-cleanup"
 )
 
 type FerrVaultSecretReconciler struct {
@@ -39,10 +39,10 @@ type FerrVaultSecretReconciler struct {
 	Broker                 *TokenBroker
 }
 
-// +kubebuilder:rbac:groups=ferrvault.io,resources=ferrvaultsecrets,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=ferrvault.io,resources=ferrvaultsecrets/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=ferrvault.io,resources=ferrvaultsecrets/finalizers,verbs=update
-// +kubebuilder:rbac:groups=ferrvault.io,resources=ferrvaultconnections,verbs=get;list;watch
+// +kubebuilder:rbac:groups=ferrvault.com,resources=ferrvaultsecrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=ferrvault.com,resources=ferrvaultsecrets/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=ferrvault.com,resources=ferrvaultsecrets/finalizers,verbs=update
+// +kubebuilder:rbac:groups=ferrvault.com,resources=ferrvaultconnections,verbs=get;list;watch
 
 func (r *FerrVaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithValues("ferrvaultsecret", req.NamespacedName)
@@ -240,7 +240,7 @@ func (r *FerrVaultSecretReconciler) ensureTargetSecret(
 		if secret.Annotations == nil {
 			secret.Annotations = map[string]string{}
 		}
-		secret.Annotations["ferrvault.io/managed-by"] = "ferrflow-operator"
+		secret.Annotations["ferrvault.com/managed-by"] = "ferrflow-operator"
 		secret.Annotations[fvAnnotationContentHash] = newHash
 		secret.StringData = data
 		secret.Data = nil
