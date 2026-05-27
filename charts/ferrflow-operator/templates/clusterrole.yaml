@@ -17,13 +17,13 @@ rules:
     resources: [ferrflowsecrets/finalizers, ferrflowconnections/finalizers]
     verbs: [update]
 
-  - apiGroups: ["ferrvault.io"]
+  - apiGroups: ["ferrvault.com"]
     resources: [ferrvaultsecrets, ferrvaultconnections]
     verbs: [get, list, watch, create, update, patch, delete]
-  - apiGroups: ["ferrvault.io"]
+  - apiGroups: ["ferrvault.com"]
     resources: [ferrvaultsecrets/status, ferrvaultconnections/status]
     verbs: [get, update, patch]
-  - apiGroups: ["ferrvault.io"]
+  - apiGroups: ["ferrvault.com"]
     resources: [ferrvaultsecrets/finalizers, ferrvaultconnections/finalizers]
     verbs: [update]
 

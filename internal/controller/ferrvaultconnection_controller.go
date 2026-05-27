@@ -23,7 +23,7 @@ import (
 	"github.com/FerrLabs/FerrFlow-Operator/internal/ferrflow"
 )
 
-const fvConnectionFinalizer = "ferrvault.io/connection-cleanup"
+const fvConnectionFinalizer = "ferrvault.com/connection-cleanup"
 
 type FerrVaultConnectionReconciler struct {
 	client.Client
@@ -31,8 +31,8 @@ type FerrVaultConnectionReconciler struct {
 	Broker *TokenBroker
 }
 
-// +kubebuilder:rbac:groups=ferrvault.io,resources=ferrvaultconnections,verbs=get;list;watch
-// +kubebuilder:rbac:groups=ferrvault.io,resources=ferrvaultconnections/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=ferrvault.com,resources=ferrvaultconnections,verbs=get;list;watch
+// +kubebuilder:rbac:groups=ferrvault.com,resources=ferrvaultconnections/status,verbs=get;update;patch
 
 func (r *FerrVaultConnectionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithValues("ferrvaultconnection", req.NamespacedName)
