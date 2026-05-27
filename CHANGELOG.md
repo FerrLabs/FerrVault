@@ -4,6 +4,12 @@ All notable changes to `ferrflow-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [2.0.0] - 2026-05-27
+
+### Breaking Changes
+
+- feat(api)!: add ferrvault.io/v1alpha1 CRDs alongside ferrflow.io (#94)
+
 ## [1.1.1] - 2026-05-26
 
 ### Bug Fixes
