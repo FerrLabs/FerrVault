@@ -4,6 +4,12 @@ All notable changes to `ferrflow-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [3.0.2] - 2026-06-03
+
+### Bug Fixes
+
+- fix(deps): update rust crate webpki-roots to v1 (#111)
+
 ## [3.0.1] - 2026-06-03
 
 ## [3.0.0] - 2026-05-27
