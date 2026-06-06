@@ -12,7 +12,6 @@ jobs:
     name: CI
     uses: FerrLabs/.github/.github/workflows/reusable-ci-go.yml@main
     with:
-      runner: ubuntu-latest
       build-paths: ./cmd/...
       enable-sonar: true
     secrets: inherit

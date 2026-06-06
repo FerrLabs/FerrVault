@@ -18,6 +18,5 @@ jobs:
     name: Secrets + CVE
     uses: FerrLabs/.github/.github/workflows/reusable-security-scan.yml@main
     with:
-      runner: ubuntu-latest
       run-on-private: true
     secrets: inherit
