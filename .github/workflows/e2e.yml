@@ -55,7 +55,7 @@ jobs:
         if: steps.gate.outputs.has_go == 'true'
         uses: azure/setup-helm@v4
         with:
-          version: v3.16.4
+          version: v3.21.0
 
       - name: Download dependencies
         if: steps.gate.outputs.has_go == 'true'
