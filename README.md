@@ -129,7 +129,7 @@ rendered from the chart *is* the canonical version.
 
 ## Prerequisites in FerrFlow
 
-The operator relies on endpoints in [`FerrLabs/Application`](https://github.com/FerrLabs/Application) that shipped in `api@v4.0.0`:
+The operator relies on endpoints in [`FerrLabs/FerrVault-Cloud`](https://github.com/FerrLabs/FerrVault-Cloud) that shipped in `api@v4.0.0`:
 
 - API token auth (`Authorization: Bearer fft_...`) with granular scopes — #268
 - `secrets:read` scope enforcement on all secrets routes — #268

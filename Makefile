@@ -5,7 +5,7 @@
 # and release wiring as the project grows.
 
 SHELL := /usr/bin/env bash
-IMG ?= ghcr.io/ferrflow-org/ferrflow-operator:dev
+IMG ?= ghcr.io/ferrlabs/ferrflow-operator:dev
 CHART_DIR := charts/ferrflow-operator
 
 .PHONY: help
