@@ -4,6 +4,12 @@ All notable changes to `ferrflow-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [3.0.3] - 2026-06-08
+
+### Bug Fixes
+
+- fix: correct ghcr namespace, security contact, API repo link, and connection URL (#129)
+
 ## [3.0.2] - 2026-06-03
 
 ### Bug Fixes
