@@ -1,7 +1,8 @@
 # ferrflow-operator
 
 [![Latest release](https://img.shields.io/github/v/release/FerrLabs/FerrFlow-Operator)](https://github.com/FerrLabs/FerrFlow-Operator/releases/latest)
-[![Coverage](https://codecov.io/gh/FerrLabs/FerrFlow-Operator/graph/badge.svg)](https://codecov.io/gh/FerrLabs/FerrFlow-Operator)
+[![Quality Gate](https://sonar.ferrlabs.com/api/project_badges/measure?project=FerrVault&metric=alert_status&token=sqb_d3cde9fc7a86f70e3652d22ce13b5a39522212c8)](https://sonar.ferrlabs.com/dashboard?id=FerrVault)
+[![Coverage](https://sonar.ferrlabs.com/api/project_badges/measure?project=FerrVault&metric=coverage&token=sqb_d3cde9fc7a86f70e3652d22ce13b5a39522212c8)](https://sonar.ferrlabs.com/dashboard?id=FerrVault)
 [![License](https://img.shields.io/github/license/FerrLabs/FerrFlow-Operator)](LICENSE)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/FerrLabs/FerrVault/badge)](https://scorecard.dev/viewer/?uri=github.com/FerrLabs/FerrVault)
 
