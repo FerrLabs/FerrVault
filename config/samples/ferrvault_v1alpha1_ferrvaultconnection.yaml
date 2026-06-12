@@ -5,7 +5,6 @@ metadata:
   namespace: my-app
 spec:
   url: https://api.ferrvault.com
-  organization: my-org
   tokenSecretRef:
     name: ferrvault-sat
     key: token

@@ -48,7 +48,10 @@ spec:
             metadata: { type: object }
             spec:
               type: object
-              required: [url, organization]
+              required: [url]
+              x-kubernetes-validations:
+                - rule: "self.mode != 'ferrflow' || (has(self.organization) && self.organization != '')"
+                  message: "organization is required when mode is ferrflow"
               properties:
                 mode:
                   type: string
@@ -65,8 +68,7 @@ spec:
                   description: Base URL of the FerrVault API (without trailing slash).
                 organization:
                   type: string
-                  minLength: 1
-                  description: FerrVault org slug. Ignored when mode=ferrvault (SAT scopes the request).
+                  description: FerrVault org slug. Required when mode=ferrflow; ignored when mode=ferrvault (SAT scopes the request).
                 tokenSecretRef:
                   type: object
                   required: [name, key]
