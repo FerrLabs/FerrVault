@@ -4,6 +4,12 @@ All notable changes to `ferrflow-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [3.0.4] - 2026-06-12
+
+### Bug Fixes
+
+- fix(operator): trim whitespace from tokenSecretRef value before sending as Bearer (#136)
+
 ## [3.0.3] - 2026-06-08
 
 ### Bug Fixes
