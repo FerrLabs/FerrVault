@@ -20,7 +20,7 @@ metadata:
   namespace: my-app
 spec:
   mode: ferrvault
-  url: https://ferrvault.com
+  url: https://api.ferrvault.com
   organization: my-org
   tokenSecretRef:
     name: ferrvault-sat
