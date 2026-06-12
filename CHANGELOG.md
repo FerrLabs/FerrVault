@@ -4,6 +4,12 @@ All notable changes to `ferrflow-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [3.0.6] - 2026-06-12
+
+### Bug Fixes
+
+- fix(operator): point ferrvault-mode connection sample at api.ferrvault.com (#138)
+
 ## [3.0.5] - 2026-06-12
 
 ### Bug Fixes
