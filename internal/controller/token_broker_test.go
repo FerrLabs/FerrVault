@@ -208,3 +208,60 @@ func TestBroker_InvalidateForcesRefresh(t *testing.T) {
 		t.Fatalf("exchanger called %d times, want 2 (once initial, once post-invalidate)", calls)
 	}
 }
+
+func TestReconciler_InjectedBrokerSharesOIDCCache(t *testing.T) {
+	conn := &ffv1alpha1.FerrFlowConnection{
+		ObjectMeta: metav1.ObjectMeta{Name: "conn", Namespace: "ns"},
+		Spec: ffv1alpha1.FerrFlowConnectionSpec{
+			URL:          "https://ferrflow.example.com",
+			Organization: "acme",
+			OIDC:         &ffv1alpha1.OIDCAuth{ClusterID: "c"},
+		},
+	}
+	reader := func(_ string) (string, error) { return "jwt", nil }
+	calls := 0
+	exchanger := func(_ context.Context, _, _, _ string) (string, time.Time, error) {
+		calls++
+		return "bearer", time.Now().Add(15 * time.Minute), nil
+	}
+
+	broker := brokerWithFakes(t, reader, exchanger)
+	r := &FerrFlowSecretReconciler{Client: broker.Client, Broker: broker}
+
+	for i := 0; i < 2; i++ {
+		if _, err := r.loadToken(context.Background(), conn); err != nil {
+			t.Fatalf("loadToken iter %d: %v", i, err)
+		}
+	}
+	if calls != 1 {
+		t.Fatalf("exchanger called %d times with an injected broker, want 1 (cache must persist across reconciles)", calls)
+	}
+}
+
+func TestReconciler_NilBrokerDoesNotPersistCache(t *testing.T) {
+	conn := &ffv1alpha1.FerrFlowConnection{
+		ObjectMeta: metav1.ObjectMeta{Name: "conn", Namespace: "ns"},
+		Spec: ffv1alpha1.FerrFlowConnectionSpec{
+			URL:          "https://ferrflow.example.com",
+			Organization: "acme",
+			TokenSecretRef: &ffv1alpha1.SecretKeyRef{
+				Name: "tok", Key: "token",
+			},
+		},
+	}
+	scheme := newTestScheme(t)
+	sec := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "tok", Namespace: "ns"},
+		Data:       map[string][]byte{"token": []byte("fft_abc123")},
+	}
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sec).Build()
+
+	r := &FerrFlowSecretReconciler{Client: c}
+	got, err := r.loadToken(context.Background(), conn)
+	if err != nil {
+		t.Fatalf("loadToken: %v", err)
+	}
+	if got != "fft_abc123" {
+		t.Fatalf("token = %q, want fft_abc123", got)
+	}
+}
