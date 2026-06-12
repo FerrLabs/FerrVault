@@ -93,6 +93,8 @@ jobs:
           kubectl wait --for=condition=Established=True \
             crd/ferrflowconnections.ferrflow.io \
             crd/ferrflowsecrets.ferrflow.io \
+            crd/ferrvaultconnections.ferrvault.com \
+            crd/ferrvaultsecrets.ferrvault.com \
             --timeout=30s
 
       - name: Apply a CR pointing at a non-existent FerrFlow and watch the reconciler fail gracefully
@@ -152,6 +154,58 @@ jobs:
           kubectl logs -n ferrflow-operator-system -l app.kubernetes.io/name=ferrflow-operator --tail=200
           exit 1
 
+      - name: Apply a ferrvault.com CR pointing at a non-existent FerrVault and watch the reconciler fail gracefully
+        if: steps.gate.outputs.has_go == 'true'
+        # Mirrors the ferrflow.io smoke test for the new ferrvault.com path:
+        # exercises the FerrVaultConnection/FerrVaultSecret reconcilers, their
+        # apiGroups: ["ferrvault.com"] RBAC rules, and the SAT reveal branch.
+        run: |
+          kubectl create namespace demo-fv
+          kubectl -n demo-fv create secret generic ferrvault-sat \
+            --from-literal=token=sat_not_a_real_token_just_smoke_testing
+          cat <<'CR' | kubectl apply -f -
+          apiVersion: ferrvault.com/v1alpha1
+          kind: FerrVaultConnection
+          metadata:
+            name: smoke
+            namespace: demo-fv
+          spec:
+            url: http://ferrvault-does-not-exist.demo-fv.svc.cluster.local
+            tokenSecretRef:
+              name: ferrvault-sat
+              key: token
+          ---
+          apiVersion: ferrvault.com/v1alpha1
+          kind: FerrVaultSecret
+          metadata:
+            name: api-credentials
+            namespace: demo-fv
+          spec:
+            connectionRef: { name: smoke }
+            vault: production
+            selector:
+              names: [DATABASE_URL]
+            target:
+              name: api-credentials
+            refreshInterval: 30s
+          CR
+
+          for i in $(seq 1 30); do
+            ready=$(kubectl -n demo-fv get ferrvaultsecret api-credentials -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "")
+            reason=$(kubectl -n demo-fv get ferrvaultsecret api-credentials -o jsonpath='{.status.conditions[?(@.type=="Ready")].reason}' 2>/dev/null || echo "")
+            echo "[${i}/30] Ready=${ready:-<unset>} Reason=${reason:-<unset>}"
+            if [ "$ready" = "False" ] && [ -n "$reason" ]; then
+              echo "FerrVaultSecret reconciler reached the failure branch as expected â€” good."
+              exit 0
+            fi
+            sleep 5
+          done
+
+          echo "Timed out waiting for Ready=False â€” FerrVaultSecret reconciler may be stuck."
+          kubectl -n demo-fv describe ferrvaultsecret api-credentials
+          kubectl logs -n ferrflow-operator-system -l app.kubernetes.io/name=ferrflow-operator --tail=200
+          exit 1
+
       - name: Dump operator logs on failure
         if: failure() && steps.gate.outputs.has_go == 'true'
         run: |
@@ -161,3 +215,5 @@ jobs:
           kubectl logs -n ferrflow-operator-system -l app.kubernetes.io/name=ferrflow-operator --tail=500 || true
           echo "=== events in demo ==="
           kubectl get events -n demo --sort-by=.lastTimestamp || true
+          echo "=== events in demo-fv ==="
+          kubectl get events -n demo-fv --sort-by=.lastTimestamp || true
