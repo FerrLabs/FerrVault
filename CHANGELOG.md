@@ -4,6 +4,12 @@ All notable changes to `ferrflow-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [3.0.7] - 2026-06-12
+
+### Bug Fixes
+
+- fix(operator): inject one shared TokenBroker into all reconcilers so the OIDC cache persists (#141)
+
 ## [3.0.6] - 2026-06-12
 
 ### Bug Fixes
