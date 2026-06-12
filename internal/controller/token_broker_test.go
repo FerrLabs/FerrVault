@@ -71,6 +71,48 @@ func TestBroker_TokenSecretRefMissingSecretFails(t *testing.T) {
 	}
 }
 
+func TestBroker_TokenSecretRefTrimsWhitespace(t *testing.T) {
+	conn := &ffv1alpha1.FerrFlowConnection{
+		ObjectMeta: metav1.ObjectMeta{Name: "conn", Namespace: "ns"},
+		Spec: ffv1alpha1.FerrFlowConnectionSpec{
+			URL:            "https://ferrflow.example.com",
+			Organization:   "acme",
+			TokenSecretRef: &ffv1alpha1.SecretKeyRef{Name: "tok", Key: "token"},
+		},
+	}
+	sec := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "tok", Namespace: "ns"},
+		Data:       map[string][]byte{"token": []byte("fft_abc123\n")},
+	}
+	b := brokerWithFakes(t, nil, nil, sec)
+	got, err := b.TokenFor(context.Background(), conn)
+	if err != nil {
+		t.Fatalf("TokenFor: %v", err)
+	}
+	if got != "fft_abc123" {
+		t.Fatalf("token = %q, want fft_abc123 (trailing newline must be trimmed)", got)
+	}
+}
+
+func TestBroker_TokenSecretRefAllWhitespaceFails(t *testing.T) {
+	conn := &ffv1alpha1.FerrFlowConnection{
+		ObjectMeta: metav1.ObjectMeta{Name: "conn", Namespace: "ns"},
+		Spec: ffv1alpha1.FerrFlowConnectionSpec{
+			URL:            "https://ferrflow.example.com",
+			Organization:   "acme",
+			TokenSecretRef: &ffv1alpha1.SecretKeyRef{Name: "tok", Key: "token"},
+		},
+	}
+	sec := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "tok", Namespace: "ns"},
+		Data:       map[string][]byte{"token": []byte("  \n\t ")},
+	}
+	b := brokerWithFakes(t, nil, nil, sec)
+	if _, err := b.TokenFor(context.Background(), conn); err == nil {
+		t.Fatalf("expected error for all-whitespace token value")
+	}
+}
+
 func TestBroker_OIDCHappyPathCaches(t *testing.T) {
 	conn := &ffv1alpha1.FerrFlowConnection{
 		ObjectMeta: metav1.ObjectMeta{Name: "conn", Namespace: "ns"},
