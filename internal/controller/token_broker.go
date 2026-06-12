@@ -145,10 +145,11 @@ func (b *TokenBroker) loadFromSecret(
 	if !ok {
 		return "", fmt.Errorf("key %q missing from token Secret %s", ref.Key, key)
 	}
-	if len(raw) == 0 {
+	token := strings.TrimSpace(string(raw))
+	if token == "" {
 		return "", fmt.Errorf("token Secret %s has empty value at key %q", key, ref.Key)
 	}
-	return string(raw), nil
+	return token, nil
 }
 
 func (b *TokenBroker) loadFromOIDC(
