@@ -103,7 +103,7 @@ func (r *FerrVaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	var reveal *ferrflow.BulkRevealResponse
-	switch conn.Spec.ResolvedMode() {
+	switch conn.ResolvedMode() {
 	case ffv1alpha1.ModeFerrVault:
 		reveal, err = ffc.RevealFromVault(ctx, cr.Spec.Vault, cr.Spec.Selector.Names)
 	default:

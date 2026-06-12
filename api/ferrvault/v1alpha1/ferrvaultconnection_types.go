@@ -31,6 +31,13 @@ type FerrVaultConnectionList struct {
 	Items           []FerrVaultConnection `json:"items"`
 }
 
+func (in *FerrVaultConnection) ResolvedMode() string {
+	if in.Spec.Mode == "" {
+		return ffv1alpha1.ModeFerrVault
+	}
+	return in.Spec.Mode
+}
+
 func (in *FerrVaultConnection) DeepCopyInto(out *FerrVaultConnection) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
