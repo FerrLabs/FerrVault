@@ -86,10 +86,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	broker := controller.NewTokenBroker(mgr.GetClient())
+
 	if err := (&controller.FerrFlowSecretReconciler{
 		Client:                 mgr.GetClient(),
 		Scheme:                 mgr.GetScheme(),
 		DefaultRefreshInterval: defaultRefreshInterval,
+		Broker:                 broker,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "FerrFlowSecret")
 		os.Exit(1)
@@ -98,6 +101,7 @@ func main() {
 	if err := (&controller.FerrFlowConnectionReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		Broker: broker,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "FerrFlowConnection")
 		os.Exit(1)
@@ -107,6 +111,7 @@ func main() {
 		Client:                 mgr.GetClient(),
 		Scheme:                 mgr.GetScheme(),
 		DefaultRefreshInterval: defaultRefreshInterval,
+		Broker:                 broker,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "FerrVaultSecret")
 		os.Exit(1)
@@ -115,6 +120,7 @@ func main() {
 	if err := (&controller.FerrVaultConnectionReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		Broker: broker,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "FerrVaultConnection")
 		os.Exit(1)
