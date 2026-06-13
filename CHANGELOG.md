@@ -4,6 +4,12 @@ All notable changes to `ferrflow-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [3.0.11] - 2026-06-13
+
+### Bug Fixes
+
+- fix(deps): update rust crate reqwest to 0.13 (#108)
+
 ## [3.0.10] - 2026-06-13
 
 ### Bug Fixes
