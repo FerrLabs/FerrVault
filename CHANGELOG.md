@@ -4,6 +4,12 @@ All notable changes to `ferrflow-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [3.0.8] - 2026-06-13
+
+### Bug Fixes
+
+- fix(operator): make organization optional for FerrVaultConnection except in ferrflow mode (#139)
+
 ## [3.0.7] - 2026-06-12
 
 ### Bug Fixes
