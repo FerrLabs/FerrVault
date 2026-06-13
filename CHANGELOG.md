@@ -4,6 +4,12 @@ All notable changes to `ferrflow-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [3.0.10] - 2026-06-13
+
+### Bug Fixes
+
+- fix(deps): update module sigs.k8s.io/controller-runtime to v0.24.1 (#87)
+
 ## [3.0.9] - 2026-06-13
 
 ### Bug Fixes
