@@ -182,6 +182,7 @@ jobs:
             namespace: demo-fv
           spec:
             connectionRef: { name: smoke }
+            project: production
             vault: production
             selector:
               names: [DATABASE_URL]
