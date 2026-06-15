@@ -78,6 +78,6 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Attest binary provenance (SLSA)
         if: runner.os == 'Linux' || runner.os == 'macOS'
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4
         with:
           subject-path: target/${{ matrix.target }}/release/ferrvault
