@@ -19,7 +19,7 @@ import (
 
 	fvv1alpha1 "github.com/FerrLabs/FerrVault/api/ferrvault/v1alpha1"
 	ffv1alpha1 "github.com/FerrLabs/FerrVault/api/v1alpha1"
-	"github.com/FerrLabs/FerrVault/internal/ferrflow"
+	"github.com/FerrLabs/FerrVault/internal/ferrvault"
 )
 
 const (
@@ -102,7 +102,7 @@ func (r *FerrVaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return r.failReady(ctx, &cr, "InvalidConnection", err.Error())
 	}
 
-	var reveal *ferrflow.BulkRevealResponse
+	var reveal *ferrvault.BulkRevealResponse
 	switch conn.ResolvedMode() {
 	case ffv1alpha1.ModeFerrVault:
 		reveal, err = ffc.RevealFromVault(ctx, cr.Spec.Vault, cr.Spec.Selector.Names)
@@ -117,10 +117,10 @@ func (r *FerrVaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		)
 	}
 	if err != nil {
-		if ferrflow.IsAuthError(err) {
+		if ferrvault.IsAuthError(err) {
 			return r.failReadyWithRequeue(ctx, &cr, "AuthFailed", err.Error(), 5*time.Minute)
 		}
-		if ferrflow.IsNotFound(err) {
+		if ferrvault.IsNotFound(err) {
 			return r.failReadyWithRequeue(ctx, &cr, "VaultNotFound", err.Error(), r.refreshInterval(&cr))
 		}
 		return r.failReadyWithRequeue(ctx, &cr, "Unreachable", err.Error(), r.refreshInterval(&cr))

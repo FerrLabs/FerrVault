@@ -20,7 +20,7 @@ import (
 
 	fvv1alpha1 "github.com/FerrLabs/FerrVault/api/ferrvault/v1alpha1"
 	ffv1alpha1 "github.com/FerrLabs/FerrVault/api/v1alpha1"
-	"github.com/FerrLabs/FerrVault/internal/ferrflow"
+	"github.com/FerrLabs/FerrVault/internal/ferrvault"
 )
 
 const fvConnectionFinalizer = "ferrvault.com/connection-cleanup"
@@ -147,7 +147,7 @@ func (r *FerrVaultConnectionReconciler) probe(
 	if err != nil {
 		return metav1.ConditionFalse, "TokenUnreadable", err.Error()
 	}
-	ffc, err := ferrflow.New(conn.Spec.URL, token)
+	ffc, err := ferrvault.New(conn.Spec.URL, token)
 	if err != nil {
 		return metav1.ConditionFalse, "InvalidConnection", err.Error()
 	}

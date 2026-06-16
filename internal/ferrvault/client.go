@@ -1,8 +1,8 @@
-// Package ferrflow is the HTTP client the operator uses to talk to a FerrFlow
+// Package ferrvault is the HTTP client the operator uses to talk to a FerrVault
 // API instance. It's deliberately narrow: only the endpoints the reconciler
 // actually needs, with sharp error typing so the controller can translate
 // transport failures into `Ready=False` conditions without guessing.
-package ferrflow
+package ferrvault
 
 import (
 	"bytes"
@@ -49,7 +49,7 @@ func DefaultRetryPolicy() RetryPolicy {
 	}
 }
 
-// Client is a narrow FerrFlow HTTP client.
+// Client is a narrow FerrVault HTTP client.
 //
 // Zero value is not usable; construct via `New`.
 type Client struct {
@@ -70,18 +70,18 @@ func WithRetry(p RetryPolicy) Option {
 }
 
 // New constructs a client targeting `baseURL` with the given bearer token.
-// `baseURL` is the API root — e.g. `https://ferrflow.example.com`. The client
+// `baseURL` is the API root — e.g. `https://ferrvault.example.com`. The client
 // adds `/api/v1/...` paths itself.
 func New(baseURL, token string, opts ...Option) (*Client, error) {
 	if token == "" {
-		return nil, errors.New("ferrflow: empty API token")
+		return nil, errors.New("ferrvault: empty API token")
 	}
 	u, err := url.Parse(baseURL)
 	if err != nil {
-		return nil, fmt.Errorf("ferrflow: invalid base URL %q: %w", baseURL, err)
+		return nil, fmt.Errorf("ferrvault: invalid base URL %q: %w", baseURL, err)
 	}
 	if u.Scheme != "http" && u.Scheme != "https" {
-		return nil, fmt.Errorf("ferrflow: base URL must use http(s), got %q", baseURL)
+		return nil, fmt.Errorf("ferrvault: base URL must use http(s), got %q", baseURL)
 	}
 	c := &Client{
 		baseURL: u,
@@ -97,7 +97,7 @@ func New(baseURL, token string, opts ...Option) (*Client, error) {
 	return c, nil
 }
 
-// Probe is a lightweight reachability check against the FerrFlow API.
+// Probe is a lightweight reachability check against the FerrVault API.
 // Calls `GET <baseURL>/health` (public, unauthenticated) and succeeds when
 // the response is 200 with a JSON body containing `{"status":"ok"}`.
 //
@@ -112,7 +112,7 @@ func (c *Client) Probe(ctx context.Context) error {
 	_, err := c.doWithRetry(ctx, func() (*http.Response, error) {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 		if err != nil {
-			return nil, fmt.Errorf("ferrflow: build probe request: %w", err)
+			return nil, fmt.Errorf("ferrvault: build probe request: %w", err)
 		}
 		req.Header.Set("Accept", "application/json")
 		return c.http.Do(req)
@@ -145,9 +145,9 @@ type VaultSummary struct {
 
 // IsClusterIdentity reports whether the configured token is a cluster
 // identity (`ffclust_...`) rather than a user API token (`fft_...`). The
-// FerrFlow API's reveal endpoint enforces namespace-scoped authorization when
+// FerrVault API's reveal endpoint enforces namespace-scoped authorization when
 // the caller authenticates with a cluster identity, and requires the
-// `X-FerrFlow-Namespace` header on every request.
+// `X-FerrVault-Namespace` header on every request.
 func (c *Client) IsClusterIdentity() bool {
 	return strings.HasPrefix(c.token, "ffclust_")
 }
@@ -160,13 +160,13 @@ type OIDCExchangeResponse struct {
 }
 
 // OIDCExchange posts an OIDC JWT (typically a projected ServiceAccount
-// token) to FerrFlow and returns the minted short-lived cluster bearer +
+// token) to FerrVault and returns the minted short-lived cluster bearer +
 // its expiry. The endpoint is unauthenticated — the JWT body IS the auth —
 // so the `Authorization` header on the outbound request is irrelevant and
 // we just set the dummy token the client was built with.
 //
 // Used by the token broker. The returned bearer can be fed back into a new
-// `ferrflow.New` client instance for downstream API calls.
+// `ferrvault.New` client instance for downstream API calls.
 func (c *Client) OIDCExchange(
 	ctx context.Context,
 	clusterID, saToken string,
@@ -180,7 +180,7 @@ func (c *Client) OIDCExchange(
 	}{clusterID, saToken}
 	payload, err := json.Marshal(body)
 	if err != nil {
-		return "", time.Time{}, fmt.Errorf("ferrflow: encode oidc exchange request: %w", err)
+		return "", time.Time{}, fmt.Errorf("ferrvault: encode oidc exchange request: %w", err)
 	}
 
 	var out OIDCExchangeResponse
@@ -188,7 +188,7 @@ func (c *Client) OIDCExchange(
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(),
 			bytes.NewReader(payload))
 		if err != nil {
-			return nil, fmt.Errorf("ferrflow: build request: %w", err)
+			return nil, fmt.Errorf("ferrvault: build request: %w", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
@@ -197,7 +197,7 @@ func (c *Client) OIDCExchange(
 		switch resp.StatusCode {
 		case http.StatusOK:
 			if err := json.Unmarshal(body, &out); err != nil {
-				return fmt.Errorf("ferrflow: decode oidc response: %w", err)
+				return fmt.Errorf("ferrvault: decode oidc response: %w", err)
 			}
 			return nil
 		case http.StatusUnauthorized:
@@ -223,7 +223,7 @@ func (c *Client) OIDCExchange(
 // BulkReveal returns the requested secrets from the named vault. When `names`
 // is empty the server returns every secret in the vault. `namespace` is the
 // Kubernetes namespace the request is made from — sent as
-// `X-FerrFlow-Namespace` on every call. The API **requires** this header when
+// `X-FerrVault-Namespace` on every call. The API **requires** this header when
 // the token is a cluster identity and ignores it otherwise. Returned `Missing`
 // lists requested keys that weren't present — `Ready=False` worthy on the
 // caller's CR.
@@ -250,7 +250,7 @@ func (c *Client) BulkReveal(
 	_, err := c.doWithRetry(ctx, func() (*http.Response, error) {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 		if err != nil {
-			return nil, fmt.Errorf("ferrflow: build request: %w", err)
+			return nil, fmt.Errorf("ferrvault: build request: %w", err)
 		}
 		req.Header.Set("Authorization", "Bearer "+c.token)
 		req.Header.Set("Accept", "application/json")
@@ -259,14 +259,14 @@ func (c *Client) BulkReveal(
 		// switch token types by just swapping the Secret, no operator
 		// config change.
 		if namespace != "" {
-			req.Header.Set("X-FerrFlow-Namespace", namespace)
+			req.Header.Set("X-FerrVault-Namespace", namespace)
 		}
 		return c.http.Do(req)
 	}, func(resp *http.Response, body []byte) error {
 		switch resp.StatusCode {
 		case http.StatusOK:
 			if err := json.Unmarshal(body, &out); err != nil {
-				return fmt.Errorf("ferrflow: decode response: %w", err)
+				return fmt.Errorf("ferrvault: decode response: %w", err)
 			}
 			return nil
 		case http.StatusUnauthorized:
@@ -329,7 +329,7 @@ func (c *Client) RevealFromVault(
 
 	bodyBytes, err := json.Marshal(vaultRevealRequest{Vault: vault, Names: names})
 	if err != nil {
-		return nil, fmt.Errorf("ferrflow: encode reveal body: %w", err)
+		return nil, fmt.Errorf("ferrvault: encode reveal body: %w", err)
 	}
 
 	var raw vaultRevealResponse
@@ -338,7 +338,7 @@ func (c *Client) RevealFromVault(
 			ctx, http.MethodPost, u.String(), bytes.NewReader(bodyBytes),
 		)
 		if err != nil {
-			return nil, fmt.Errorf("ferrflow: build request: %w", err)
+			return nil, fmt.Errorf("ferrvault: build request: %w", err)
 		}
 		req.Header.Set("Authorization", "Bearer "+c.token)
 		req.Header.Set("Accept", "application/json")
@@ -348,7 +348,7 @@ func (c *Client) RevealFromVault(
 		switch resp.StatusCode {
 		case http.StatusOK:
 			if err := json.Unmarshal(body, &raw); err != nil {
-				return fmt.Errorf("ferrflow: decode response: %w", err)
+				return fmt.Errorf("ferrvault: decode response: %w", err)
 			}
 			return nil
 		case http.StatusUnauthorized:
@@ -499,7 +499,7 @@ func annotateAttempts(err error, attempts int) {
 	}
 }
 
-// errorMessage pulls the `{"error": "..."}` field from a FerrFlow error
+// errorMessage pulls the `{"error": "..."}` field from a FerrVault error
 // payload, falling back to a default string when parsing fails.
 func errorMessage(body []byte, fallback string) string {
 	var wire struct {
@@ -521,7 +521,7 @@ type TransportError struct {
 }
 
 func (e *TransportError) Error() string {
-	return fmt.Sprintf("ferrflow transport error: %v", e.Underlying)
+	return fmt.Sprintf("ferrvault transport error: %v", e.Underlying)
 }
 func (e *TransportError) Unwrap() error { return e.Underlying }
 
@@ -544,9 +544,9 @@ type AuthError struct {
 func (e *AuthError) Error() string {
 	switch e.Kind {
 	case AuthForbidden:
-		return fmt.Sprintf("ferrflow forbidden: %s", e.Message)
+		return fmt.Sprintf("ferrvault forbidden: %s", e.Message)
 	default:
-		return fmt.Sprintf("ferrflow unauthorized: %s", e.Message)
+		return fmt.Sprintf("ferrvault unauthorized: %s", e.Message)
 	}
 }
 
@@ -561,7 +561,7 @@ type NotFoundError struct {
 	Message string
 }
 
-func (e *NotFoundError) Error() string { return fmt.Sprintf("ferrflow not found: %s", e.Message) }
+func (e *NotFoundError) Error() string { return fmt.Sprintf("ferrvault not found: %s", e.Message) }
 
 // IsNotFound reports whether the error represents a 404.
 func IsNotFound(err error) bool {
@@ -578,5 +578,5 @@ type APIError struct {
 }
 
 func (e *APIError) Error() string {
-	return fmt.Sprintf("ferrflow api error %d: %s", e.Status, e.Message)
+	return fmt.Sprintf("ferrvault api error %d: %s", e.Status, e.Message)
 }
