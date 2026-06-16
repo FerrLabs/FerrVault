@@ -312,7 +312,7 @@ type vaultRevealResponse struct {
 // RevealFromVault fetches `names` from the named FerrVault vault via the new
 // `POST /v1/operator/secrets/reveal` endpoint. `names` is optional — pass an
 // empty slice to pull every secret the SAT can see. The token is interpreted
-// as a SAT (`sat_…`) and bound server-side to a specific vault; `vault` here
+// as a SAT (`fvsat_…`) and bound server-side to a specific vault; `vault` here
 // must match the SAT's vault scope or the API responds 403.
 //
 // The result is mapped onto `BulkRevealResponse` so the controller can stay
