@@ -23,7 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	ffv1alpha1 "github.com/FerrLabs/FerrVault/api/v1alpha1"
-	"github.com/FerrLabs/FerrVault/internal/ferrflow"
+	"github.com/FerrLabs/FerrVault/internal/ferrvault"
 )
 
 // connectionRefIndexKey is the field-indexer key for
@@ -64,7 +64,7 @@ type FerrFlowSecretReconciler struct {
 
 	// ClientFactory builds the FerrFlow HTTP client. Left nil in production —
 	// the reconciler falls back to defaultClientFactory, which hands back a
-	// real *ferrflow.Client. Unit tests inject a fake here.
+	// real *ferrvault.Client. Unit tests inject a fake here.
 	ClientFactory ClientFactory
 
 	// Broker resolves the bearer for the connection's configured auth
@@ -172,7 +172,7 @@ func (r *FerrFlowSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// `/v1/operator/secrets/reveal`. The SAT token already scopes the request
 	// to a specific vault, so `organization` / `project` are not part of the
 	// path — the controller just passes `vault` + the optional names list.
-	var reveal *ferrflow.BulkRevealResponse
+	var reveal *ferrvault.BulkRevealResponse
 	switch conn.Spec.ResolvedMode() {
 	case ffv1alpha1.ModeFerrVault:
 		reveal, err = ffc.RevealFromVault(ctx, cr.Spec.Vault, cr.Spec.Selector.Names)
@@ -188,10 +188,10 @@ func (r *FerrFlowSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 	if err != nil {
 		// 401/403 are terminal until the user fixes their token — longer backoff.
-		if ferrflow.IsAuthError(err) {
+		if ferrvault.IsAuthError(err) {
 			return r.failReadyWithRequeue(ctx, &cr, "AuthFailed", err.Error(), 5*time.Minute)
 		}
-		if ferrflow.IsNotFound(err) {
+		if ferrvault.IsNotFound(err) {
 			return r.failReadyWithRequeue(ctx, &cr, "VaultNotFound", err.Error(), r.refreshInterval(&cr))
 		}
 		// Transport or 5xx: stamp status so the CR surfaces the failure, then

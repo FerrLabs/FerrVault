@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	ffv1alpha1 "github.com/FerrLabs/FerrVault/api/v1alpha1"
-	"github.com/FerrLabs/FerrVault/internal/ferrflow"
+	"github.com/FerrLabs/FerrVault/internal/ferrvault"
 )
 
 // Probe cadence. Ten minutes is a sensible default — reachability doesn't
@@ -195,7 +195,7 @@ func (r *FerrFlowConnectionReconciler) probe(
 	if err != nil {
 		return metav1.ConditionFalse, "TokenUnreadable", err.Error()
 	}
-	ffc, err := ferrflow.New(conn.Spec.URL, token)
+	ffc, err := ferrvault.New(conn.Spec.URL, token)
 	if err != nil {
 		return metav1.ConditionFalse, "InvalidConnection", err.Error()
 	}

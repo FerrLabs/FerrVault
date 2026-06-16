@@ -30,7 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	ffv1alpha1 "github.com/FerrLabs/FerrVault/api/v1alpha1"
-	"github.com/FerrLabs/FerrVault/internal/ferrflow"
+	"github.com/FerrLabs/FerrVault/internal/ferrvault"
 )
 
 // oidcRefreshLeeway is how early (before expiry) we refresh the cached
@@ -64,7 +64,7 @@ type TokenBroker struct {
 	ReadToken tokenReader
 
 	// Exchange is the HTTP POST to FerrFlow's `/clusters/oidc-exchange`.
-	// Set to nil to use the real ferrflow.Client. Tests inject fakes.
+	// Set to nil to use the real ferrvault.Client. Tests inject fakes.
 	Exchange oidcExchanger
 
 	mu    sync.Mutex
@@ -231,16 +231,16 @@ func (b *TokenBroker) Invalidate(namespace, name string) {
 	delete(b.cache, cacheKey{namespace, name})
 }
 
-// realExchange is the production exchanger — builds a ferrflow.Client with
+// realExchange is the production exchanger — builds a ferrvault.Client with
 // an empty bearer (the exchange endpoint is public) and calls OIDCExchange.
 func realExchange(
 	ctx context.Context,
 	baseURL, clusterID, saToken string,
 ) (string, time.Time, error) {
-	// ferrflow.New requires a non-empty token; we pass a dummy "anonymous"
+	// ferrvault.New requires a non-empty token; we pass a dummy "anonymous"
 	// string because the exchange endpoint doesn't inspect the Bearer at
 	// all — the body IS the auth.
-	c, err := ferrflow.New(baseURL, "anonymous")
+	c, err := ferrvault.New(baseURL, "anonymous")
 	if err != nil {
 		return "", time.Time{}, err
 	}

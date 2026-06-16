@@ -17,14 +17,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	ffv1alpha1 "github.com/FerrLabs/FerrVault/api/v1alpha1"
-	"github.com/FerrLabs/FerrVault/internal/ferrflow"
+	"github.com/FerrLabs/FerrVault/internal/ferrvault"
 )
 
-// fakeFerrFlow is a test double for ferrflowClient. Each test sets bulkReveal
+// fakeFerrFlow is a test double for ferrvaultClient. Each test sets bulkReveal
 // or revealFromVault to shape the response or error.
 type fakeFerrFlow struct {
-	bulkReveal      func(ctx context.Context, org, project, vault, namespace string, names []string) (*ferrflow.BulkRevealResponse, error)
-	revealFromVault func(ctx context.Context, vault string, names []string) (*ferrflow.BulkRevealResponse, error)
+	bulkReveal      func(ctx context.Context, org, project, vault, namespace string, names []string) (*ferrvault.BulkRevealResponse, error)
+	revealFromVault func(ctx context.Context, vault string, names []string) (*ferrvault.BulkRevealResponse, error)
 	// calls is incremented on every invocation (of either method) so tests
 	// can assert the reconciler hit the client at all (or didn't).
 	calls int
@@ -34,10 +34,10 @@ func (f *fakeFerrFlow) BulkReveal(
 	ctx context.Context,
 	org, project, vault, namespace string,
 	names []string,
-) (*ferrflow.BulkRevealResponse, error) {
+) (*ferrvault.BulkRevealResponse, error) {
 	f.calls++
 	if f.bulkReveal == nil {
-		return &ferrflow.BulkRevealResponse{Secrets: map[string]string{}}, nil
+		return &ferrvault.BulkRevealResponse{Secrets: map[string]string{}}, nil
 	}
 	return f.bulkReveal(ctx, org, project, vault, namespace, names)
 }
@@ -46,10 +46,10 @@ func (f *fakeFerrFlow) RevealFromVault(
 	ctx context.Context,
 	vault string,
 	names []string,
-) (*ferrflow.BulkRevealResponse, error) {
+) (*ferrvault.BulkRevealResponse, error) {
 	f.calls++
 	if f.revealFromVault == nil {
-		return &ferrflow.BulkRevealResponse{Secrets: map[string]string{}}, nil
+		return &ferrvault.BulkRevealResponse{Secrets: map[string]string{}}, nil
 	}
 	return f.revealFromVault(ctx, vault, names)
 }
@@ -163,7 +163,7 @@ func newTestReconciler(t *testing.T, objs []client.Object, fakeFF *fakeFerrFlow)
 		Client:                 c,
 		Scheme:                 scheme,
 		DefaultRefreshInterval: time.Hour,
-		ClientFactory: func(baseURL, token string) (ferrflowClient, error) {
+		ClientFactory: func(baseURL, token string) (ferrvaultClient, error) {
 			return fakeFF, nil
 		},
 	}
@@ -199,8 +199,8 @@ func TestReconcile_HappyPath(t *testing.T) {
 	tok := baseTokenSecret()
 
 	fakeFF := &fakeFerrFlow{
-		bulkReveal: func(_ context.Context, _, _, _, _ string, _ []string) (*ferrflow.BulkRevealResponse, error) {
-			return &ferrflow.BulkRevealResponse{
+		bulkReveal: func(_ context.Context, _, _, _, _ string, _ []string) (*ferrvault.BulkRevealResponse, error) {
+			return &ferrvault.BulkRevealResponse{
 				Secrets: map[string]string{"K": "V"},
 			}, nil
 		},
@@ -278,14 +278,14 @@ func TestReconcile_FerrVaultMode_CallsRevealFromVault(t *testing.T) {
 	var bulkRevealCalls, revealFromVaultCalls int
 	var gotVault string
 	fakeFF := &fakeFerrFlow{
-		bulkReveal: func(_ context.Context, _, _, _, _ string, _ []string) (*ferrflow.BulkRevealResponse, error) {
+		bulkReveal: func(_ context.Context, _, _, _, _ string, _ []string) (*ferrvault.BulkRevealResponse, error) {
 			bulkRevealCalls++
-			return &ferrflow.BulkRevealResponse{}, nil
+			return &ferrvault.BulkRevealResponse{}, nil
 		},
-		revealFromVault: func(_ context.Context, vault string, _ []string) (*ferrflow.BulkRevealResponse, error) {
+		revealFromVault: func(_ context.Context, vault string, _ []string) (*ferrvault.BulkRevealResponse, error) {
 			revealFromVaultCalls++
 			gotVault = vault
-			return &ferrflow.BulkRevealResponse{
+			return &ferrvault.BulkRevealResponse{
 				Secrets: map[string]string{"K": "V"},
 			}, nil
 		},
@@ -350,10 +350,10 @@ func TestReconcile_EmptyTokenValue(t *testing.T) {
 func TestReconcile_AuthErrors(t *testing.T) {
 	cases := []struct {
 		name string
-		kind ferrflow.AuthKind
+		kind ferrvault.AuthKind
 	}{
-		{"401Unauthorized", ferrflow.AuthUnauthorized},
-		{"403Forbidden", ferrflow.AuthForbidden},
+		{"401Unauthorized", ferrvault.AuthUnauthorized},
+		{"403Forbidden", ferrvault.AuthForbidden},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -361,8 +361,8 @@ func TestReconcile_AuthErrors(t *testing.T) {
 			conn := baseConn()
 			tok := baseTokenSecret()
 			fakeFF := &fakeFerrFlow{
-				bulkReveal: func(_ context.Context, _, _, _, _ string, _ []string) (*ferrflow.BulkRevealResponse, error) {
-					return nil, &ferrflow.AuthError{Kind: tc.kind, Message: "nope"}
+				bulkReveal: func(_ context.Context, _, _, _, _ string, _ []string) (*ferrvault.BulkRevealResponse, error) {
+					return nil, &ferrvault.AuthError{Kind: tc.kind, Message: "nope"}
 				},
 			}
 			r := newTestReconciler(t, []client.Object{cr, conn, tok}, fakeFF)
@@ -387,8 +387,8 @@ func TestReconcile_NotFoundError(t *testing.T) {
 	conn := baseConn()
 	tok := baseTokenSecret()
 	fakeFF := &fakeFerrFlow{
-		bulkReveal: func(_ context.Context, _, _, _, _ string, _ []string) (*ferrflow.BulkRevealResponse, error) {
-			return nil, &ferrflow.NotFoundError{Message: "no such vault"}
+		bulkReveal: func(_ context.Context, _, _, _, _ string, _ []string) (*ferrvault.BulkRevealResponse, error) {
+			return nil, &ferrvault.NotFoundError{Message: "no such vault"}
 		},
 	}
 	r := newTestReconciler(t, []client.Object{cr, conn, tok}, fakeFF)
@@ -412,8 +412,8 @@ func TestReconcile_TransportError(t *testing.T) {
 	conn := baseConn()
 	tok := baseTokenSecret()
 	fakeFF := &fakeFerrFlow{
-		bulkReveal: func(_ context.Context, _, _, _, _ string, _ []string) (*ferrflow.BulkRevealResponse, error) {
-			return nil, &ferrflow.TransportError{Underlying: errors.New("dial: timeout")}
+		bulkReveal: func(_ context.Context, _, _, _, _ string, _ []string) (*ferrvault.BulkRevealResponse, error) {
+			return nil, &ferrvault.TransportError{Underlying: errors.New("dial: timeout")}
 		},
 	}
 	r := newTestReconciler(t, []client.Object{cr, conn, tok}, fakeFF)
@@ -437,8 +437,8 @@ func TestReconcile_MissingKeys(t *testing.T) {
 	conn := baseConn()
 	tok := baseTokenSecret()
 	fakeFF := &fakeFerrFlow{
-		bulkReveal: func(_ context.Context, _, _, _, _ string, _ []string) (*ferrflow.BulkRevealResponse, error) {
-			return &ferrflow.BulkRevealResponse{
+		bulkReveal: func(_ context.Context, _, _, _, _ string, _ []string) (*ferrvault.BulkRevealResponse, error) {
+			return &ferrvault.BulkRevealResponse{
 				Secrets: map[string]string{"K1": "V1"},
 				Missing: []string{"K2"},
 			}, nil
@@ -501,8 +501,8 @@ func TestReconcile_TargetSecretDriftCorrection(t *testing.T) {
 		StringData: map[string]string{"K": "WRONG", "STALE": "X"},
 	}
 	fakeFF := &fakeFerrFlow{
-		bulkReveal: func(_ context.Context, _, _, _, _ string, _ []string) (*ferrflow.BulkRevealResponse, error) {
-			return &ferrflow.BulkRevealResponse{Secrets: map[string]string{"K": "V"}}, nil
+		bulkReveal: func(_ context.Context, _, _, _, _ string, _ []string) (*ferrvault.BulkRevealResponse, error) {
+			return &ferrvault.BulkRevealResponse{Secrets: map[string]string{"K": "V"}}, nil
 		},
 	}
 	r := newTestReconciler(t, []client.Object{cr, conn, tok, garbage}, fakeFF)
@@ -534,8 +534,8 @@ func TestReconcile_OwnerReferencePropagation(t *testing.T) {
 	conn := baseConn()
 	tok := baseTokenSecret()
 	fakeFF := &fakeFerrFlow{
-		bulkReveal: func(_ context.Context, _, _, _, _ string, _ []string) (*ferrflow.BulkRevealResponse, error) {
-			return &ferrflow.BulkRevealResponse{Secrets: map[string]string{"K": "V"}}, nil
+		bulkReveal: func(_ context.Context, _, _, _, _ string, _ []string) (*ferrvault.BulkRevealResponse, error) {
+			return &ferrvault.BulkRevealResponse{Secrets: map[string]string{"K": "V"}}, nil
 		},
 	}
 	r := newTestReconciler(t, []client.Object{cr, conn, tok}, fakeFF)
@@ -745,8 +745,8 @@ func TestReconcile_AppliesTransforms(t *testing.T) {
 	tok := baseTokenSecret()
 
 	fakeFF := &fakeFerrFlow{
-		bulkReveal: func(_ context.Context, _, _, _, _ string, _ []string) (*ferrflow.BulkRevealResponse, error) {
-			return &ferrflow.BulkRevealResponse{
+		bulkReveal: func(_ context.Context, _, _, _, _ string, _ []string) (*ferrvault.BulkRevealResponse, error) {
+			return &ferrvault.BulkRevealResponse{
 				Secrets: map[string]string{"DB_URL": "postgres://"},
 			}, nil
 		},
@@ -786,9 +786,9 @@ func TestReconcile_TransformErrorFlipsReady(t *testing.T) {
 	tok := baseTokenSecret()
 
 	fakeFF := &fakeFerrFlow{
-		bulkReveal: func(_ context.Context, _, _, _, _ string, _ []string) (*ferrflow.BulkRevealResponse, error) {
+		bulkReveal: func(_ context.Context, _, _, _, _ string, _ []string) (*ferrvault.BulkRevealResponse, error) {
 			// Value is plainly not base64 — the transform must fail.
-			return &ferrflow.BulkRevealResponse{
+			return &ferrvault.BulkRevealResponse{
 				Secrets: map[string]string{"K": "!!!"},
 			}, nil
 		},
