@@ -1,3 +1,6 @@
+// Package v1alpha1 holds the CRD types for ferrvault.com/v1alpha1 — the
+// FerrVault-Operator's API version. The `v1alpha1` suffix advertises that
+// field names and semantics may still change before we promote to v1.
 package v1alpha1
 
 import (

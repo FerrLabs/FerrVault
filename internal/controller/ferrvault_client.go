@@ -6,7 +6,7 @@ import (
 	"github.com/FerrLabs/FerrVault/internal/ferrvault"
 )
 
-// ferrvaultClient is the narrow surface of the FerrFlow HTTP client the
+// ferrvaultClient is the narrow surface of the FerrVault HTTP client the
 // reconciler actually uses. Scoped down so tests can inject a fake without
 // needing to stand up a real HTTP server.
 type ferrvaultClient interface {

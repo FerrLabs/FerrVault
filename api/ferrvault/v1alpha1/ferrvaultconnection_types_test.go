@@ -2,24 +2,22 @@ package v1alpha1
 
 import (
 	"testing"
-
-	ffv1alpha1 "github.com/FerrLabs/FerrVault/api/v1alpha1"
 )
 
 func TestFerrVaultConnection_ResolvedModeDefaultsToFerrVault(t *testing.T) {
 	conn := FerrVaultConnection{
-		Spec: ffv1alpha1.FerrFlowConnectionSpec{Mode: ""},
+		Spec: ConnectionSpec{Mode: ""},
 	}
-	if got := conn.ResolvedMode(); got != ffv1alpha1.ModeFerrVault {
-		t.Fatalf("ResolvedMode() = %q, want %q for an empty mode", got, ffv1alpha1.ModeFerrVault)
+	if got := conn.ResolvedMode(); got != ModeFerrVault {
+		t.Fatalf("ResolvedMode() = %q, want %q for an empty mode", got, ModeFerrVault)
 	}
 }
 
-func TestFerrVaultConnection_ResolvedModeHonoursExplicitFerrFlow(t *testing.T) {
+func TestFerrVaultConnection_ResolvedModeHonoursExplicitCloud(t *testing.T) {
 	conn := FerrVaultConnection{
-		Spec: ffv1alpha1.FerrFlowConnectionSpec{Mode: ffv1alpha1.ModeFerrFlow},
+		Spec: ConnectionSpec{Mode: ModeCloud},
 	}
-	if got := conn.ResolvedMode(); got != ffv1alpha1.ModeFerrFlow {
-		t.Fatalf("ResolvedMode() = %q, want %q when explicitly set", got, ffv1alpha1.ModeFerrFlow)
+	if got := conn.ResolvedMode(); got != ModeCloud {
+		t.Fatalf("ResolvedMode() = %q, want %q when explicitly set", got, ModeCloud)
 	}
 }

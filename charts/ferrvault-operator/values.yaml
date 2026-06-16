@@ -19,7 +19,7 @@ leaderElection:
   enabled: true
   # Lease name in the kube-system coordinated store. Change if you run several
   # independent instances of the operator in the same cluster.
-  id: ferrvault-operator.ferrflow.io
+  id: ferrvault-operator.ferrvault.com
 
 # --- Scope ---
 # Empty string = cluster-wide (operator watches every namespace). Set to a
@@ -27,7 +27,7 @@ leaderElection:
 watchNamespace: ""
 
 # --- Runtime flags ---
-# Default refresh interval applied when a FerrFlowSecret omits `spec.refreshInterval`.
+# Default refresh interval applied when a FerrVaultSecret omits `spec.refreshInterval`.
 defaultRefreshInterval: 1h
 # Log level for the operator's zap logger (debug, info, warn, error).
 logLevel: info

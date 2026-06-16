@@ -50,25 +50,25 @@ spec:
               type: object
               required: [url]
               x-kubernetes-validations:
-                - rule: "self.mode != 'ferrflow' || (has(self.organization) && self.organization != '')"
-                  message: "organization is required when mode is ferrflow"
+                - rule: "self.mode != 'cloud' || (has(self.organization) && self.organization != '')"
+                  message: "organization is required when mode is cloud"
               properties:
                 mode:
                   type: string
-                  enum: [ferrflow, ferrvault]
+                  enum: [cloud, ferrvault]
                   default: ferrvault
                   description: |
                     Backend API the operator talks to. For `FerrVaultConnection`,
                     `ferrvault` is the natural default — flat
                     `/v1/operator/secrets/reveal` shape with a SAT token. Set to
-                    `ferrflow` only for legacy FerrLabs-Cloud reveal paths.
+                    `cloud` only for legacy FerrLabs-Cloud reveal paths.
                 url:
                   type: string
                   pattern: '^https?://'
                   description: Base URL of the FerrVault API (without trailing slash).
                 organization:
                   type: string
-                  description: FerrVault org slug. Required when mode=ferrflow; ignored when mode=ferrvault (SAT scopes the request).
+                  description: FerrVault org slug. Required when mode=cloud; ignored when mode=ferrvault (SAT scopes the request).
                 tokenSecretRef:
                   type: object
                   required: [name, key]

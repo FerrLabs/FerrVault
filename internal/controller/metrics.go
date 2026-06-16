@@ -7,17 +7,17 @@ import (
 	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
-// Custom Prometheus collectors for the FerrFlow controllers. Registered with
+// Custom Prometheus collectors for the FerrVault controllers. Registered with
 // controller-runtime's shared registry so they show up on the manager's
 // existing :8080/metrics endpoint — no separate HTTP server needed.
 var (
-	// SyncDuration records wall-clock reconcile latency for FerrFlowSecret,
+	// SyncDuration records wall-clock reconcile latency for FerrVaultSecret,
 	// partitioned by outcome. Default buckets are fine: reconciles are
-	// dominated by one HTTP round-trip to the FerrFlow API, not sub-ms work.
+	// dominated by one HTTP round-trip to the FerrVault API, not sub-ms work.
 	SyncDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "ferrflow_secret_sync_duration_seconds",
-			Help:    "Duration of FerrFlowSecret reconciles, labelled by result (success/failure).",
+			Name:    "ferrvault_secret_sync_duration_seconds",
+			Help:    "Duration of FerrVaultSecret reconciles, labelled by result (success/failure).",
 			Buckets: prometheus.DefBuckets,
 		},
 		[]string{"result"},
@@ -28,8 +28,8 @@ var (
 	// alerts and dashboards line up with CR status.
 	SyncErrors = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "ferrflow_secret_sync_errors_total",
-			Help: "FerrFlowSecret reconcile failures, labelled by reason.",
+			Name: "ferrvault_secret_sync_errors_total",
+			Help: "FerrVaultSecret reconcile failures, labelled by reason.",
 		},
 		[]string{"reason"},
 	)
@@ -38,18 +38,18 @@ var (
 	// per CR. Useful for "nothing synced in the last hour" style alerts.
 	LastSyncTimestamp = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "ferrflow_secret_last_sync_timestamp_seconds",
-			Help: "Unix timestamp of the last successful FerrFlowSecret sync.",
+			Name: "ferrvault_secret_last_sync_timestamp_seconds",
+			Help: "Unix timestamp of the last successful FerrVaultSecret sync.",
 		},
 		[]string{"namespace", "name"},
 	)
 
-	// ConnectionReady is 1 when a FerrFlowConnection's Ready condition is
+	// ConnectionReady is 1 when a FerrVaultConnection's Ready condition is
 	// True, 0 otherwise.
 	ConnectionReady = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "ferrflow_connection_ready",
-			Help: "Whether a FerrFlowConnection is Ready (1) or not (0).",
+			Name: "ferrvault_connection_ready",
+			Help: "Whether a FerrVaultConnection is Ready (1) or not (0).",
 		},
 		[]string{"namespace", "name"},
 	)

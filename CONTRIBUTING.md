@@ -62,8 +62,8 @@ One branch per topic. Don't mix unrelated changes.
 Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```
-feat: add FerrFlowSecret reconciler
-fix(api): handle 404 from FerrFlow reveal endpoint
+feat: add FerrVaultSecret reconciler
+fix(api): handle 404 from FerrVault reveal endpoint
 docs: update Helm chart installation steps
 ```
 

@@ -1,7 +1,7 @@
 // Command manager is the entry point for the ferrvault-operator binary.
 //
 // It stands up a controller-runtime Manager, registers the CRD types in the
-// scheme, wires the FerrFlowSecret reconciler in, and blocks on the
+// scheme, wires the FerrVaultSecret reconciler in, and blocks on the
 // manager's run loop until the process receives SIGTERM / SIGINT.
 package main
 
@@ -21,7 +21,6 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	fvv1alpha1 "github.com/FerrLabs/FerrVault/api/ferrvault/v1alpha1"
-	ffv1alpha1 "github.com/FerrLabs/FerrVault/api/v1alpha1"
 	"github.com/FerrLabs/FerrVault/internal/controller"
 )
 
@@ -32,7 +31,6 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(ffv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(fvv1alpha1.AddToScheme(scheme))
 }
 
@@ -53,10 +51,10 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Only a single replica processes CRs when enabled.")
-	flag.StringVar(&leaderElectionID, "leader-elect-id", "ferrvault-operator.ferrflow.io",
+	flag.StringVar(&leaderElectionID, "leader-elect-id", "ferrvault-operator.ferrvault.com",
 		"Resource name used for the leader-election lease.")
 	flag.DurationVar(&defaultRefreshInterval, "default-refresh-interval", time.Hour,
-		"Fallback refresh interval used when a FerrFlowSecret omits spec.refreshInterval.")
+		"Fallback refresh interval used when a FerrVaultSecret omits spec.refreshInterval.")
 	flag.StringVar(&watchNamespace, "watch-namespace", "",
 		"Restrict the controller to a single namespace. Empty means cluster-wide.")
 
@@ -87,25 +85,6 @@ func main() {
 	}
 
 	broker := controller.NewTokenBroker(mgr.GetClient())
-
-	if err := (&controller.FerrFlowSecretReconciler{
-		Client:                 mgr.GetClient(),
-		Scheme:                 mgr.GetScheme(),
-		DefaultRefreshInterval: defaultRefreshInterval,
-		Broker:                 broker,
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "FerrFlowSecret")
-		os.Exit(1)
-	}
-
-	if err := (&controller.FerrFlowConnectionReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-		Broker: broker,
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "FerrFlowConnection")
-		os.Exit(1)
-	}
 
 	if err := (&controller.FerrVaultSecretReconciler{
 		Client:                 mgr.GetClient(),

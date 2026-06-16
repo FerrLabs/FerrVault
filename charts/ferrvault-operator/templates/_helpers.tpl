@@ -40,7 +40,7 @@ helm.sh/chart: {{ include "ferrvault-operator.chart" . }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
-app.kubernetes.io/part-of: ferrflow
+app.kubernetes.io/part-of: ferrvault
 {{- end }}
 
 {{/*

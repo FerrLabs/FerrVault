@@ -2,7 +2,6 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // LocalObjectReference is a namespaced reference with just a name, used to
@@ -12,7 +11,7 @@ type LocalObjectReference struct {
 	Name string `json:"name"`
 }
 
-// SecretSelector picks which keys to pull from the referenced FerrFlow vault.
+// SecretSelector picks which keys to pull from the referenced FerrVault vault.
 type SecretSelector struct {
 	// Names is an explicit list of secret keys to sync. When empty, every
 	// secret in the vault is synced.
@@ -24,8 +23,7 @@ type SecretSelector struct {
 // SecretTarget controls the Kubernetes Secret the operator writes to.
 type SecretTarget struct {
 	// Name of the `Secret` to create or update in the same namespace as the
-	// CR. Defaults to `metadata.name` of the `FerrFlowSecret` itself when
-	// omitted.
+	// CR. Defaults to `metadata.name` of the secret CR itself when omitted.
 	//
 	// +optional
 	Name string `json:"name,omitempty"`
@@ -38,8 +36,8 @@ type SecretTarget struct {
 }
 
 // WorkloadRef identifies a workload whose pods should be rolled when secret
-// values change. The operator adds an annotation (`ferrflow.io/restartedAt`)
-// to the pod template to trigger a rolling restart.
+// values change. The operator adds an annotation to the pod template to
+// trigger a rolling restart.
 type WorkloadRef struct {
 	// Kind of the workload. One of: Deployment, StatefulSet, DaemonSet.
 	//
@@ -52,7 +50,7 @@ type WorkloadRef struct {
 	Name string `json:"name"`
 }
 
-// SecretTransform rewrites the `{key: value}` map returned by the FerrFlow
+// SecretTransform rewrites the `{key: value}` map returned by the FerrVault
 // API before it lands in the target Secret. Transforms are applied in the
 // order declared. Exactly one of the payload fields relevant to `type` must
 // be set — the CRD enforces this via OpenAPI validation at admission time.
@@ -98,22 +96,22 @@ type SecretTransform struct {
 	Key string `json:"key,omitempty"`
 }
 
-// FerrFlowSecretSpec declares a sync from a FerrFlow vault into a native
-// Kubernetes Secret. The operator reconciles this CR on the configured
-// `refreshInterval`, or immediately when the spec changes.
-type FerrFlowSecretSpec struct {
-	// ConnectionRef points at a FerrFlowConnection in the same namespace.
+// SecretSpec declares a sync from a FerrVault vault into a native Kubernetes
+// Secret. The operator reconciles this CR on the configured `refreshInterval`,
+// or immediately when the spec changes.
+type SecretSpec struct {
+	// ConnectionRef points at a connection in the same namespace.
 	//
 	// +kubebuilder:validation:Required
 	ConnectionRef LocalObjectReference `json:"connectionRef"`
 
-	// Project is the FerrFlow project slug.
+	// Project is the FerrVault project slug.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength=1
 	Project string `json:"project"`
 
-	// Vault is the FerrFlow vault name inside the project (often used as the
+	// Vault is the FerrVault vault name inside the project (often used as the
 	// environment identifier: `production`, `staging`, …).
 	//
 	// +kubebuilder:validation:Required
@@ -130,7 +128,7 @@ type FerrFlowSecretSpec struct {
 	// +optional
 	Target SecretTarget `json:"target,omitempty"`
 
-	// RefreshInterval is the cadence at which the operator polls FerrFlow for
+	// RefreshInterval is the cadence at which the operator polls FerrVault for
 	// value changes, expressed in Go's `time.Duration` syntax (`30m`, `1h`).
 	// Defaults to `1h`. Set to `0s` to disable scheduled refreshes (the
 	// operator still reacts to spec changes).
@@ -141,7 +139,7 @@ type FerrFlowSecretSpec struct {
 
 	// RolloutRestart lists workloads whose pods should be rolled when secret
 	// values change. Pattern: the operator patches the pod template's
-	// `ferrflow.io/restartedAt` annotation to force a rolling update.
+	// restart annotation to force a rolling update.
 	//
 	// +optional
 	RolloutRestart []WorkloadRef `json:"rolloutRestart,omitempty"`
@@ -154,8 +152,8 @@ type FerrFlowSecretSpec struct {
 	Transforms []SecretTransform `json:"transforms,omitempty"`
 }
 
-// FerrFlowSecretStatus reports the last reconciliation outcome.
-type FerrFlowSecretStatus struct {
+// SecretStatus reports the last reconciliation outcome.
+type SecretStatus struct {
 	// Conditions conveys the health of this sync. The primary condition is
 	// `Ready` — `True` when the target Secret mirrors the desired keys.
 	//
@@ -177,7 +175,7 @@ type FerrFlowSecretStatus struct {
 	SyncedKeys []string `json:"syncedKeys,omitempty"`
 
 	// MissingKeys lists keys that were requested in `spec.selector.names` but
-	// were not present in the FerrFlow vault at last reveal. When non-empty,
+	// were not present in the FerrVault vault at last reveal. When non-empty,
 	// `Ready` is set to `False`.
 	//
 	// +optional
@@ -190,87 +188,8 @@ type FerrFlowSecretStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
-// +kubebuilder:object:root=true
-// +kubebuilder:resource:scope=Namespaced,shortName=ffs
-// +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="Project",type=string,JSONPath=`.spec.project`
-// +kubebuilder:printcolumn:name="Vault",type=string,JSONPath=`.spec.vault`
-// +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
-// +kubebuilder:printcolumn:name="LastSynced",type=date,JSONPath=`.status.lastSyncedAt`
-// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
-
-// FerrFlowSecret is the Schema for the ferrflowsecrets API.
-type FerrFlowSecret struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec   FerrFlowSecretSpec   `json:"spec,omitempty"`
-	Status FerrFlowSecretStatus `json:"status,omitempty"`
-}
-
-// +kubebuilder:object:root=true
-
-// FerrFlowSecretList contains a list of FerrFlowSecret.
-type FerrFlowSecretList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []FerrFlowSecret `json:"items"`
-}
-
-// DeepCopyInto copies the receiver into out.
-func (in *FerrFlowSecret) DeepCopyInto(out *FerrFlowSecret) {
-	*out = *in
-	out.TypeMeta = in.TypeMeta
-	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
-	in.Spec.DeepCopyInto(&out.Spec)
-	in.Status.DeepCopyInto(&out.Status)
-}
-
-// DeepCopy returns a deep copy of the receiver.
-func (in *FerrFlowSecret) DeepCopy() *FerrFlowSecret {
-	if in == nil {
-		return nil
-	}
-	out := new(FerrFlowSecret)
-	in.DeepCopyInto(out)
-	return out
-}
-
-// DeepCopyObject implements runtime.Object.
-func (in *FerrFlowSecret) DeepCopyObject() runtime.Object {
-	return in.DeepCopy()
-}
-
-// DeepCopyInto copies the receiver into out.
-func (in *FerrFlowSecretList) DeepCopyInto(out *FerrFlowSecretList) {
-	*out = *in
-	out.TypeMeta = in.TypeMeta
-	in.ListMeta.DeepCopyInto(&out.ListMeta)
-	if in.Items != nil {
-		out.Items = make([]FerrFlowSecret, len(in.Items))
-		for i := range in.Items {
-			in.Items[i].DeepCopyInto(&out.Items[i])
-		}
-	}
-}
-
-// DeepCopy returns a deep copy of the receiver.
-func (in *FerrFlowSecretList) DeepCopy() *FerrFlowSecretList {
-	if in == nil {
-		return nil
-	}
-	out := new(FerrFlowSecretList)
-	in.DeepCopyInto(out)
-	return out
-}
-
-// DeepCopyObject implements runtime.Object.
-func (in *FerrFlowSecretList) DeepCopyObject() runtime.Object {
-	return in.DeepCopy()
-}
-
-// DeepCopyInto for Spec — slice fields need deep copies.
-func (in *FerrFlowSecretSpec) DeepCopyInto(out *FerrFlowSecretSpec) {
+// DeepCopyInto for SecretSpec — slice fields need deep copies.
+func (in *SecretSpec) DeepCopyInto(out *SecretSpec) {
 	*out = *in
 	out.ConnectionRef = in.ConnectionRef
 	if in.Selector.Names != nil {
@@ -300,8 +219,8 @@ func (in *SecretTransform) DeepCopyInto(out *SecretTransform) {
 	}
 }
 
-// DeepCopyInto for Status — includes Time pointer + slices.
-func (in *FerrFlowSecretStatus) DeepCopyInto(out *FerrFlowSecretStatus) {
+// DeepCopyInto for SecretStatus — includes Time pointer + slices.
+func (in *SecretStatus) DeepCopyInto(out *SecretStatus) {
 	*out = *in
 	if in.Conditions != nil {
 		out.Conditions = make([]metav1.Condition, len(in.Conditions))

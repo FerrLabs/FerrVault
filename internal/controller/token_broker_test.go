@@ -6,13 +6,32 @@ import (
 	"testing"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	ffv1alpha1 "github.com/FerrLabs/FerrVault/api/v1alpha1"
+	fvv1alpha1 "github.com/FerrLabs/FerrVault/api/ferrvault/v1alpha1"
 )
+
+// newTestScheme registers the types the reconciler reads/writes so the fake
+// client can encode them.
+func newTestScheme(t *testing.T) *runtime.Scheme {
+	t.Helper()
+	s := runtime.NewScheme()
+	if err := fvv1alpha1.AddToScheme(s); err != nil {
+		t.Fatalf("add fvv1alpha1 to scheme: %v", err)
+	}
+	if err := corev1.AddToScheme(s); err != nil {
+		t.Fatalf("add corev1 to scheme: %v", err)
+	}
+	if err := appsv1.AddToScheme(s); err != nil {
+		t.Fatalf("add appsv1 to scheme: %v", err)
+	}
+	return s
+}
 
 // brokerWithFakes returns a broker wired to a fake k8s client and the
 // provided in-memory reader + exchanger. Lets each test stub the bits
@@ -34,12 +53,12 @@ func brokerWithFakes(
 }
 
 func TestBroker_TokenSecretRefHappyPath(t *testing.T) {
-	conn := &ffv1alpha1.FerrFlowConnection{
+	conn := &fvv1alpha1.FerrVaultConnection{
 		ObjectMeta: metav1.ObjectMeta{Name: "conn", Namespace: "ns"},
-		Spec: ffv1alpha1.FerrFlowConnectionSpec{
-			URL:            "https://ferrflow.example.com",
+		Spec: fvv1alpha1.ConnectionSpec{
+			URL:            "https://ferrvault.example.com",
 			Organization:   "acme",
-			TokenSecretRef: &ffv1alpha1.SecretKeyRef{Name: "tok", Key: "token"},
+			TokenSecretRef: &fvv1alpha1.SecretKeyRef{Name: "tok", Key: "token"},
 		},
 	}
 	sec := &corev1.Secret{
@@ -57,12 +76,12 @@ func TestBroker_TokenSecretRefHappyPath(t *testing.T) {
 }
 
 func TestBroker_TokenSecretRefMissingSecretFails(t *testing.T) {
-	conn := &ffv1alpha1.FerrFlowConnection{
+	conn := &fvv1alpha1.FerrVaultConnection{
 		ObjectMeta: metav1.ObjectMeta{Name: "conn", Namespace: "ns"},
-		Spec: ffv1alpha1.FerrFlowConnectionSpec{
-			URL:            "https://ferrflow.example.com",
+		Spec: fvv1alpha1.ConnectionSpec{
+			URL:            "https://ferrvault.example.com",
 			Organization:   "acme",
-			TokenSecretRef: &ffv1alpha1.SecretKeyRef{Name: "missing", Key: "token"},
+			TokenSecretRef: &fvv1alpha1.SecretKeyRef{Name: "missing", Key: "token"},
 		},
 	}
 	b := brokerWithFakes(t, nil, nil)
@@ -72,12 +91,12 @@ func TestBroker_TokenSecretRefMissingSecretFails(t *testing.T) {
 }
 
 func TestBroker_TokenSecretRefTrimsWhitespace(t *testing.T) {
-	conn := &ffv1alpha1.FerrFlowConnection{
+	conn := &fvv1alpha1.FerrVaultConnection{
 		ObjectMeta: metav1.ObjectMeta{Name: "conn", Namespace: "ns"},
-		Spec: ffv1alpha1.FerrFlowConnectionSpec{
-			URL:            "https://ferrflow.example.com",
+		Spec: fvv1alpha1.ConnectionSpec{
+			URL:            "https://ferrvault.example.com",
 			Organization:   "acme",
-			TokenSecretRef: &ffv1alpha1.SecretKeyRef{Name: "tok", Key: "token"},
+			TokenSecretRef: &fvv1alpha1.SecretKeyRef{Name: "tok", Key: "token"},
 		},
 	}
 	sec := &corev1.Secret{
@@ -95,12 +114,12 @@ func TestBroker_TokenSecretRefTrimsWhitespace(t *testing.T) {
 }
 
 func TestBroker_TokenSecretRefAllWhitespaceFails(t *testing.T) {
-	conn := &ffv1alpha1.FerrFlowConnection{
+	conn := &fvv1alpha1.FerrVaultConnection{
 		ObjectMeta: metav1.ObjectMeta{Name: "conn", Namespace: "ns"},
-		Spec: ffv1alpha1.FerrFlowConnectionSpec{
-			URL:            "https://ferrflow.example.com",
+		Spec: fvv1alpha1.ConnectionSpec{
+			URL:            "https://ferrvault.example.com",
 			Organization:   "acme",
-			TokenSecretRef: &ffv1alpha1.SecretKeyRef{Name: "tok", Key: "token"},
+			TokenSecretRef: &fvv1alpha1.SecretKeyRef{Name: "tok", Key: "token"},
 		},
 	}
 	sec := &corev1.Secret{
@@ -114,12 +133,12 @@ func TestBroker_TokenSecretRefAllWhitespaceFails(t *testing.T) {
 }
 
 func TestBroker_OIDCHappyPathCaches(t *testing.T) {
-	conn := &ffv1alpha1.FerrFlowConnection{
+	conn := &fvv1alpha1.FerrVaultConnection{
 		ObjectMeta: metav1.ObjectMeta{Name: "conn", Namespace: "ns"},
-		Spec: ffv1alpha1.FerrFlowConnectionSpec{
-			URL:          "https://ferrflow.example.com",
+		Spec: fvv1alpha1.ConnectionSpec{
+			URL:          "https://ferrvault.example.com",
 			Organization: "acme",
-			OIDC: &ffv1alpha1.OIDCAuth{
+			OIDC: &fvv1alpha1.OIDCAuth{
 				ClusterID: "00000000-0000-0000-0000-000000000001",
 				TokenPath: "/ignored/in/fake",
 			},
@@ -150,12 +169,12 @@ func TestBroker_OIDCHappyPathCaches(t *testing.T) {
 func TestBroker_OIDCRefreshesBeforeExpiry(t *testing.T) {
 	// Bearer expires within the refresh leeway (60s) — every TokenFor call
 	// should re-exchange instead of returning the about-to-die token.
-	conn := &ffv1alpha1.FerrFlowConnection{
+	conn := &fvv1alpha1.FerrVaultConnection{
 		ObjectMeta: metav1.ObjectMeta{Name: "conn", Namespace: "ns"},
-		Spec: ffv1alpha1.FerrFlowConnectionSpec{
-			URL:          "https://ferrflow.example.com",
+		Spec: fvv1alpha1.ConnectionSpec{
+			URL:          "https://ferrvault.example.com",
 			Organization: "acme",
-			OIDC:         &ffv1alpha1.OIDCAuth{ClusterID: "c"},
+			OIDC:         &fvv1alpha1.OIDCAuth{ClusterID: "c"},
 		},
 	}
 	reader := func(_ string) (string, error) { return "jwt", nil }
@@ -178,12 +197,12 @@ func TestBroker_OIDCRefreshesBeforeExpiry(t *testing.T) {
 }
 
 func TestBroker_OIDCExchangeErrorPropagates(t *testing.T) {
-	conn := &ffv1alpha1.FerrFlowConnection{
+	conn := &fvv1alpha1.FerrVaultConnection{
 		ObjectMeta: metav1.ObjectMeta{Name: "conn", Namespace: "ns"},
-		Spec: ffv1alpha1.FerrFlowConnectionSpec{
-			URL:          "https://ferrflow.example.com",
+		Spec: fvv1alpha1.ConnectionSpec{
+			URL:          "https://ferrvault.example.com",
 			Organization: "acme",
-			OIDC:         &ffv1alpha1.OIDCAuth{ClusterID: "c"},
+			OIDC:         &fvv1alpha1.OIDCAuth{ClusterID: "c"},
 		},
 	}
 	reader := func(_ string) (string, error) { return "jwt", nil }
@@ -197,13 +216,13 @@ func TestBroker_OIDCExchangeErrorPropagates(t *testing.T) {
 }
 
 func TestBroker_RefusesBothAuthModesSet(t *testing.T) {
-	conn := &ffv1alpha1.FerrFlowConnection{
+	conn := &fvv1alpha1.FerrVaultConnection{
 		ObjectMeta: metav1.ObjectMeta{Name: "conn", Namespace: "ns"},
-		Spec: ffv1alpha1.FerrFlowConnectionSpec{
-			URL:            "https://ferrflow.example.com",
+		Spec: fvv1alpha1.ConnectionSpec{
+			URL:            "https://ferrvault.example.com",
 			Organization:   "acme",
-			TokenSecretRef: &ffv1alpha1.SecretKeyRef{Name: "x", Key: "y"},
-			OIDC:           &ffv1alpha1.OIDCAuth{ClusterID: "c"},
+			TokenSecretRef: &fvv1alpha1.SecretKeyRef{Name: "x", Key: "y"},
+			OIDC:           &fvv1alpha1.OIDCAuth{ClusterID: "c"},
 		},
 	}
 	b := brokerWithFakes(t, nil, nil)
@@ -213,10 +232,10 @@ func TestBroker_RefusesBothAuthModesSet(t *testing.T) {
 }
 
 func TestBroker_RefusesNeitherAuthModeSet(t *testing.T) {
-	conn := &ffv1alpha1.FerrFlowConnection{
+	conn := &fvv1alpha1.FerrVaultConnection{
 		ObjectMeta: metav1.ObjectMeta{Name: "conn", Namespace: "ns"},
-		Spec: ffv1alpha1.FerrFlowConnectionSpec{
-			URL:          "https://ferrflow.example.com",
+		Spec: fvv1alpha1.ConnectionSpec{
+			URL:          "https://ferrvault.example.com",
 			Organization: "acme",
 		},
 	}
@@ -227,12 +246,12 @@ func TestBroker_RefusesNeitherAuthModeSet(t *testing.T) {
 }
 
 func TestBroker_InvalidateForcesRefresh(t *testing.T) {
-	conn := &ffv1alpha1.FerrFlowConnection{
+	conn := &fvv1alpha1.FerrVaultConnection{
 		ObjectMeta: metav1.ObjectMeta{Name: "conn", Namespace: "ns"},
-		Spec: ffv1alpha1.FerrFlowConnectionSpec{
-			URL:          "https://ferrflow.example.com",
+		Spec: fvv1alpha1.ConnectionSpec{
+			URL:          "https://ferrvault.example.com",
 			Organization: "acme",
-			OIDC:         &ffv1alpha1.OIDCAuth{ClusterID: "c"},
+			OIDC:         &fvv1alpha1.OIDCAuth{ClusterID: "c"},
 		},
 	}
 	reader := func(_ string) (string, error) { return "jwt", nil }
@@ -252,12 +271,12 @@ func TestBroker_InvalidateForcesRefresh(t *testing.T) {
 }
 
 func TestReconciler_InjectedBrokerSharesOIDCCache(t *testing.T) {
-	conn := &ffv1alpha1.FerrFlowConnection{
+	conn := &fvv1alpha1.FerrVaultConnection{
 		ObjectMeta: metav1.ObjectMeta{Name: "conn", Namespace: "ns"},
-		Spec: ffv1alpha1.FerrFlowConnectionSpec{
-			URL:          "https://ferrflow.example.com",
+		Spec: fvv1alpha1.ConnectionSpec{
+			URL:          "https://ferrvault.example.com",
 			Organization: "acme",
-			OIDC:         &ffv1alpha1.OIDCAuth{ClusterID: "c"},
+			OIDC:         &fvv1alpha1.OIDCAuth{ClusterID: "c"},
 		},
 	}
 	reader := func(_ string) (string, error) { return "jwt", nil }
@@ -268,7 +287,7 @@ func TestReconciler_InjectedBrokerSharesOIDCCache(t *testing.T) {
 	}
 
 	broker := brokerWithFakes(t, reader, exchanger)
-	r := &FerrFlowSecretReconciler{Client: broker.Client, Broker: broker}
+	r := &FerrVaultSecretReconciler{Client: broker.Client, Broker: broker}
 
 	for i := 0; i < 2; i++ {
 		if _, err := r.loadToken(context.Background(), conn); err != nil {
@@ -281,12 +300,12 @@ func TestReconciler_InjectedBrokerSharesOIDCCache(t *testing.T) {
 }
 
 func TestReconciler_NilBrokerDoesNotPersistCache(t *testing.T) {
-	conn := &ffv1alpha1.FerrFlowConnection{
+	conn := &fvv1alpha1.FerrVaultConnection{
 		ObjectMeta: metav1.ObjectMeta{Name: "conn", Namespace: "ns"},
-		Spec: ffv1alpha1.FerrFlowConnectionSpec{
-			URL:          "https://ferrflow.example.com",
+		Spec: fvv1alpha1.ConnectionSpec{
+			URL:          "https://ferrvault.example.com",
 			Organization: "acme",
-			TokenSecretRef: &ffv1alpha1.SecretKeyRef{
+			TokenSecretRef: &fvv1alpha1.SecretKeyRef{
 				Name: "tok", Key: "token",
 			},
 		},
@@ -298,7 +317,7 @@ func TestReconciler_NilBrokerDoesNotPersistCache(t *testing.T) {
 	}
 	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sec).Build()
 
-	r := &FerrFlowSecretReconciler{Client: c}
+	r := &FerrVaultSecretReconciler{Client: c}
 	got, err := r.loadToken(context.Background(), conn)
 	if err != nil {
 		t.Fatalf("loadToken: %v", err)

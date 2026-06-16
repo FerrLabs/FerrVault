@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	ffv1alpha1 "github.com/FerrLabs/FerrVault/api/v1alpha1"
+	fvv1alpha1 "github.com/FerrLabs/FerrVault/api/ferrvault/v1alpha1"
 )
 
 // Transform kind constants. Kept as typed strings rather than an iota enum
@@ -50,7 +50,7 @@ func (e *TransformError) Error() string {
 //
 // Semantics (kept deliberately conservative for the MVP):
 //
-//   - Renaming a missing key is a no-op, not an error. FerrFlow vaults are
+//   - Renaming a missing key is a no-op, not an error. FerrVault vaults are
 //     user-editable; failing the sync just because a key was removed
 //     upstream would make transforms fragile.
 //   - Prefix / suffix apply to every current key. Running twice stacks.
@@ -60,7 +60,7 @@ func (e *TransformError) Error() string {
 //     Nested objects produce underscore-joined names, upper-cased.
 //     Array values are marshalled back to JSON (opinionated: we don't
 //     invent an index notation for the MVP).
-func ApplyTransforms(input map[string]string, transforms []ffv1alpha1.SecretTransform) (map[string]string, error) {
+func ApplyTransforms(input map[string]string, transforms []fvv1alpha1.SecretTransform) (map[string]string, error) {
 	out := make(map[string]string, len(input))
 	for k, v := range input {
 		out[k] = v
@@ -79,7 +79,7 @@ func ApplyTransforms(input map[string]string, transforms []ffv1alpha1.SecretTran
 	return out, nil
 }
 
-func applyOne(in map[string]string, t ffv1alpha1.SecretTransform) (map[string]string, error) {
+func applyOne(in map[string]string, t fvv1alpha1.SecretTransform) (map[string]string, error) {
 	switch t.Type {
 	case TransformPrefix:
 		return applyAffix(in, t.Value, true), nil
@@ -112,7 +112,7 @@ func applyAffix(in map[string]string, affix string, prefix bool) map[string]stri
 	return out
 }
 
-func applyRename(in map[string]string, t ffv1alpha1.SecretTransform) (map[string]string, error) {
+func applyRename(in map[string]string, t fvv1alpha1.SecretTransform) (map[string]string, error) {
 	if t.From == "" || t.To == "" {
 		return nil, &TransformError{Type: t.Type, Msg: "rename requires both `from` and `to`"}
 	}
@@ -141,7 +141,7 @@ func applyRename(in map[string]string, t ffv1alpha1.SecretTransform) (map[string
 	return out, nil
 }
 
-func applyBase64Decode(in map[string]string, t ffv1alpha1.SecretTransform) (map[string]string, error) {
+func applyBase64Decode(in map[string]string, t fvv1alpha1.SecretTransform) (map[string]string, error) {
 	targets := t.Keys
 	if len(targets) == 0 {
 		targets = make([]string, 0, len(in))
@@ -176,7 +176,7 @@ func applyBase64Decode(in map[string]string, t ffv1alpha1.SecretTransform) (map[
 	return out, nil
 }
 
-func applyJSONExpand(in map[string]string, t ffv1alpha1.SecretTransform) (map[string]string, error) {
+func applyJSONExpand(in map[string]string, t fvv1alpha1.SecretTransform) (map[string]string, error) {
 	if t.Key == "" {
 		return nil, &TransformError{Type: t.Type, Msg: "jsonExpand requires `key`"}
 	}

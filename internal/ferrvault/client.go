@@ -102,7 +102,7 @@ func New(baseURL, token string, opts ...Option) (*Client, error) {
 // the response is 200 with a JSON body containing `{"status":"ok"}`.
 //
 // Deliberately does not exercise the token — auth correctness is reported
-// per-vault by the `FerrFlowSecret` reconciler, where the org/project/vault
+// per-vault by the `FerrVaultSecret` reconciler, where the org/project/vault
 // context is known. Probe answers the narrower question "can the operator
 // reach this API instance at all?".
 func (c *Client) Probe(ctx context.Context) error {

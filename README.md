@@ -6,46 +6,46 @@
 [![License](https://img.shields.io/github/license/FerrLabs/FerrVault)](LICENSE)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/FerrLabs/FerrVault/badge)](https://scorecard.dev/viewer/?uri=github.com/FerrLabs/FerrVault)
 
-Kubernetes operator that syncs secrets stored in [FerrFlow](https://ferrflow.com) into native Kubernetes `Secret` resources.
+Kubernetes operator that syncs secrets stored in [FerrVault](https://ferrvault.com) into native Kubernetes `Secret` resources.
 
-> **Status: alpha.** The MVP reconciler is in place — it reads secrets from a FerrFlow vault via the bulk-reveal API and materialises them into a Kubernetes Secret, with owner-ref GC and status conditions. Rolling restarts, Helm chart, and integration tests are tracked in [issue #1](https://github.com/FerrLabs/FerrVault/issues/1).
+> **Status: alpha.** The MVP reconciler is in place — it reads secrets from a FerrVault vault via the bulk-reveal API and materialises them into a Kubernetes Secret, with owner-ref GC and status conditions. Rolling restarts, Helm chart, and integration tests are tracked in [issue #1](https://github.com/FerrLabs/FerrVault/issues/1).
 
 ## Custom resources
 
-Two CRDs under `ferrflow.io/v1alpha1`:
+Two CRDs under `ferrvault.com/v1alpha1`:
 
-### `FerrFlowConnection` (shortname `ffc`)
+### `FerrVaultConnection` (shortname `fvc`)
 
-Declares how to reach a FerrFlow instance. One per (namespace, org). Shared by every `FerrFlowSecret` in that namespace that targets the same organization.
+Declares how to reach a FerrVault instance. One per (namespace, org). Shared by every `FerrVaultSecret` in that namespace that targets the same organization.
 
 ```yaml
-apiVersion: ferrflow.io/v1alpha1
-kind: FerrFlowConnection
+apiVersion: ferrvault.com/v1alpha1
+kind: FerrVaultConnection
 metadata:
   name: prod
 spec:
-  url: https://ferrflow.example.com
+  url: https://ferrvault.example.com
   organization: acme
   tokenSecretRef:
-    name: ferrflow-api-token
+    name: ferrvault-api-token
     key: token
 ```
 
-The referenced Secret must hold a FerrFlow API token (`fft_...`) with at least the `secrets:read` scope.
+The referenced Secret must hold a FerrVault API token (`fft_...`) with at least the `secrets:read` scope.
 
-### `FerrFlowSecret` (shortname `ffs`)
+### `FerrVaultSecret` (shortname `fvs`)
 
 Declares a sync from a vault to a Kubernetes Secret.
 
 ```yaml
-apiVersion: ferrflow.io/v1alpha1
-kind: FerrFlowSecret
+apiVersion: ferrvault.com/v1alpha1
+kind: FerrVaultSecret
 metadata:
   name: web-env
 spec:
   connectionRef: { name: prod }
   project: web
-  vault: production          # FerrFlow vault name (often the environment)
+  vault: production          # FerrVault vault name (often the environment)
   selector:
     names: [DATABASE_URL, STRIPE_KEY]   # omit to sync every key in the vault
   target:
@@ -91,7 +91,7 @@ Supported types:
 | `base64Decode` | `keys` (optional)   | Decodes listed keys (or all when empty) from base64.         |
 | `jsonExpand`   | `key`               | Flattens a JSON object under `<KEY>_<SUB>`. Drops the source.|
 
-Malformed transforms (unknown type, invalid base64, non-object JSON, destination-key collisions) leave the CR in `Ready=False` with `Reason=TransformError` and increment `ferrflow_secret_sync_errors_total{reason="TransformError"}`. The target Secret is not written on failure — workloads keep the last known-good value.
+Malformed transforms (unknown type, invalid base64, non-object JSON, destination-key collisions) leave the CR in `Ready=False` with `Reason=TransformError` and increment `ferrvault_secret_sync_errors_total{reason="TransformError"}`. The target Secret is not written on failure — workloads keep the last known-good value.
 
 ## Running
 
@@ -128,7 +128,7 @@ kubectl apply -f manager.yaml
 No duplicate `config/rbac/` or `config/crd/` lives in the repo — anything
 rendered from the chart *is* the canonical version.
 
-## Prerequisites in FerrFlow
+## Prerequisites in FerrVault
 
 The operator relies on endpoints in [`FerrLabs/FerrVault-Cloud`](https://github.com/FerrLabs/FerrVault-Cloud) that shipped in `api@v4.0.0`:
 

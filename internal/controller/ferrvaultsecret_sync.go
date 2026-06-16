@@ -14,7 +14,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	fvv1alpha1 "github.com/FerrLabs/FerrVault/api/ferrvault/v1alpha1"
-	ffv1alpha1 "github.com/FerrLabs/FerrVault/api/v1alpha1"
 )
 
 func (r *FerrVaultSecretReconciler) loadToken(ctx context.Context, conn *fvv1alpha1.FerrVaultConnection) (string, error) {
@@ -22,11 +21,7 @@ func (r *FerrVaultSecretReconciler) loadToken(ctx context.Context, conn *fvv1alp
 	if broker == nil {
 		broker = NewTokenBroker(r.Client)
 	}
-	adapter := &ffv1alpha1.FerrFlowConnection{
-		ObjectMeta: conn.ObjectMeta,
-		Spec:       conn.Spec,
-	}
-	return broker.TokenFor(ctx, adapter)
+	return broker.TokenFor(ctx, conn)
 }
 
 func (r *FerrVaultSecretReconciler) ensureTargetSecret(
