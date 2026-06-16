@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [5.0.0] - 2026-06-16
+
+### Breaking Changes
+
+- refactor!: remove legacy ferrflow.io API and ferrflow naming (#154)
+
 ## [4.0.1] - 2026-06-16
 
 ### Refactoring
