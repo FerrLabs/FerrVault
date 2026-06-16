@@ -19,11 +19,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	fvv1alpha1 "github.com/FerrLabs/FerrVault/api/ferrvault/v1alpha1"
-	ffv1alpha1 "github.com/FerrLabs/FerrVault/api/v1alpha1"
 	"github.com/FerrLabs/FerrVault/internal/ferrvault"
 )
 
 const fvConnectionFinalizer = "ferrvault.com/connection-cleanup"
+
+// connectionProbeInterval is how often a healthy connection re-probes the
+// FerrVault API to refresh its Ready condition.
+const connectionProbeInterval = 10 * time.Minute
+
+// connectionInUseRequeue is how often we re-check whether a connection being
+// deleted is still referenced by a secret before releasing its finalizer.
+const connectionInUseRequeue = 30 * time.Second
 
 type FerrVaultConnectionReconciler struct {
 	client.Client
@@ -139,11 +146,7 @@ func (r *FerrVaultConnectionReconciler) probe(
 	if broker == nil {
 		broker = NewTokenBroker(r.Client)
 	}
-	adapter := &ffv1alpha1.FerrFlowConnection{
-		ObjectMeta: conn.ObjectMeta,
-		Spec:       conn.Spec,
-	}
-	token, err := broker.TokenFor(ctx, adapter)
+	token, err := broker.TokenFor(ctx, conn)
 	if err != nil {
 		return metav1.ConditionFalse, "TokenUnreadable", err.Error()
 	}

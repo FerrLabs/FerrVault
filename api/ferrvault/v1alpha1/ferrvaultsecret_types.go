@@ -3,8 +3,6 @@ package v1alpha1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-
-	ffv1alpha1 "github.com/FerrLabs/FerrVault/api/v1alpha1"
 )
 
 // +kubebuilder:object:root=true
@@ -20,8 +18,8 @@ type FerrVaultSecret struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ffv1alpha1.FerrFlowSecretSpec   `json:"spec,omitempty"`
-	Status ffv1alpha1.FerrFlowSecretStatus `json:"status,omitempty"`
+	Spec   SecretSpec   `json:"spec,omitempty"`
+	Status SecretStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true

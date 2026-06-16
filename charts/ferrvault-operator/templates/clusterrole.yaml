@@ -7,16 +7,6 @@ metadata:
     {{- include "ferrvault-operator.labels" . | nindent 4 }}
 rules:
   # Full CR access for the operator's own types.
-  - apiGroups: ["ferrflow.io"]
-    resources: [ferrflowsecrets, ferrflowconnections]
-    verbs: [get, list, watch, create, update, patch, delete]
-  - apiGroups: ["ferrflow.io"]
-    resources: [ferrflowsecrets/status, ferrflowconnections/status]
-    verbs: [get, update, patch]
-  - apiGroups: ["ferrflow.io"]
-    resources: [ferrflowsecrets/finalizers, ferrflowconnections/finalizers]
-    verbs: [update]
-
   - apiGroups: ["ferrvault.com"]
     resources: [ferrvaultsecrets, ferrvaultconnections]
     verbs: [get, list, watch, create, update, patch, delete]
@@ -36,7 +26,7 @@ rules:
     resources: [secrets]
     verbs: [get, list, watch, create, update, patch]
 
-  # Emits Events that show up on `kubectl describe ferrflowsecret …`.
+  # Emits Events that show up on `kubectl describe ferrvaultsecret …`.
   - apiGroups: [""]
     resources: [events]
     verbs: [create, patch]

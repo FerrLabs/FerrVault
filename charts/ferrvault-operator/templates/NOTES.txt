@@ -2,32 +2,32 @@ ferrvault-operator {{ .Chart.AppVersion }} has been installed in namespace {{ .R
 
 Next steps:
 
-1. Create a FerrFlow API token with at least `secrets:read`, and stash it in a
+1. Create a FerrVault API token with at least `secrets:read`, and stash it in a
    Kubernetes Secret in the namespace where you'll create your
-   FerrFlowConnection:
+   FerrVaultConnection:
 
-   kubectl create secret generic ferrflow-api-token \
+   kubectl create secret generic ferrvault-api-token \
      --from-literal=token=fft_xxx_yyy \
      -n default
 
-2. Create a FerrFlowConnection pointing at your FerrFlow instance:
+2. Create a FerrVaultConnection pointing at your FerrVault instance:
 
-   apiVersion: ferrflow.io/v1alpha1
-   kind: FerrFlowConnection
+   apiVersion: ferrvault.com/v1alpha1
+   kind: FerrVaultConnection
    metadata:
      name: prod
      namespace: default
    spec:
-     url: https://ferrflow.example.com
+     url: https://ferrvault.example.com
      organization: your-org-slug
      tokenSecretRef:
-       name: ferrflow-api-token
+       name: ferrvault-api-token
        key: token
 
-3. Create a FerrFlowSecret to start syncing:
+3. Create a FerrVaultSecret to start syncing:
 
-   apiVersion: ferrflow.io/v1alpha1
-   kind: FerrFlowSecret
+   apiVersion: ferrvault.com/v1alpha1
+   kind: FerrVaultSecret
    metadata:
      name: web-env
      namespace: default
@@ -40,17 +40,17 @@ Next steps:
 
 4. Watch it reconcile:
 
-   kubectl get ferrflowsecrets,secrets -n default
-   kubectl describe ferrflowsecret web-env -n default
+   kubectl get ferrvaultsecrets,secrets -n default
+   kubectl describe ferrvaultsecret web-env -n default
    kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name={{ include "ferrvault-operator.name" . }} -f
 
 {{- if not .Values.crds.install }}
 
 CRDs were NOT installed by this chart (`crds.install=false`). Apply them
-manually before creating any FerrFlow CRs:
+manually before creating any FerrVault CRs:
 
    kubectl apply -f https://raw.githubusercontent.com/FerrLabs/FerrVault-Operator/v{{ .Chart.AppVersion }}/charts/ferrvault-operator/crds/
 {{- end }}
 
-Documentation: https://ferrflow.com/docs
+Documentation: https://ferrvault.com/docs
 Repository:    https://github.com/FerrLabs/FerrVault

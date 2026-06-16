@@ -2,7 +2,7 @@ name: E2E
 
 # Smoke test that spins up a real Kubernetes cluster (kind), builds the
 # operator image locally, installs via the Helm chart, applies sample CRs
-# backed by a mocked FerrFlow API, and asserts the reconciler behaves as
+# backed by a mocked FerrVault API, and asserts the reconciler behaves as
 # expected end-to-end. Catches bugs that `go build` + `golangci-lint` miss â€”
 # controller-runtime quirks, RBAC gaps, CRD schema errors, etc.
 
@@ -47,7 +47,7 @@ jobs:
       - uses: helm/kind-action@v1
         if: steps.gate.outputs.has_go == 'true'
         with:
-          cluster_name: ferrflow-e2e
+          cluster_name: ferrvault-e2e
           # Keep the node image pinned so a kind release doesn't break us.
           node_image: kindest/node:v1.32.2
 
@@ -67,7 +67,7 @@ jobs:
         # ships it straight to the kind node without a registry round-trip.
         run: |
           docker build -t ferrvault-operator:e2e .
-          kind load docker-image ferrvault-operator:e2e --name ferrflow-e2e
+          kind load docker-image ferrvault-operator:e2e --name ferrvault-e2e
 
       - name: Install the chart
         if: steps.gate.outputs.has_go == 'true'
@@ -91,74 +91,19 @@ jobs:
         if: steps.gate.outputs.has_go == 'true'
         run: |
           kubectl wait --for=condition=Established=True \
-            crd/ferrflowconnections.ferrflow.io \
-            crd/ferrflowsecrets.ferrflow.io \
             crd/ferrvaultconnections.ferrvault.com \
             crd/ferrvaultsecrets.ferrvault.com \
             --timeout=30s
 
-      - name: Apply a CR pointing at a non-existent FerrFlow and watch the reconciler fail gracefully
+      - name: Apply a ferrvault.com CR pointing at a non-existent FerrVault and watch the reconciler fail gracefully
         if: steps.gate.outputs.has_go == 'true'
-        # This validates: the reconciler's full loop runs; CR status transitions
-        # to Ready=False with a recognisable reason when the backend isn't
+        # Validates the FerrVaultConnection/FerrVaultSecret reconcilers, their
+        # apiGroups: ["ferrvault.com"] RBAC rules, and the SAT reveal branch:
+        # the reconciler's full loop runs and CR status transitions to
+        # Ready=False with a recognisable reason when the backend isn't
         # reachable. That's strictly better than a raw panic or a stuck
         # reconciliation â€” and it means the RBAC, owner-refs and auth-loading
         # code paths all executed.
-        run: |
-          kubectl create namespace demo
-          kubectl -n demo create secret generic ferrflow-api-token \
-            --from-literal=token=fft_not_a_real_token_just_smoke_testing
-          cat <<'CR' | kubectl apply -f -
-          apiVersion: ferrflow.io/v1alpha1
-          kind: FerrFlowConnection
-          metadata:
-            name: smoke
-            namespace: demo
-          spec:
-            url: http://ferrflow-does-not-exist.demo.svc.cluster.local
-            organization: e2e
-            tokenSecretRef:
-              name: ferrflow-api-token
-              key: token
-          ---
-          apiVersion: ferrflow.io/v1alpha1
-          kind: FerrFlowSecret
-          metadata:
-            name: web-env
-            namespace: demo
-          spec:
-            connectionRef: { name: smoke }
-            project: web
-            vault: production
-            selector:
-              names: [DATABASE_URL]
-            target:
-              name: web-env
-            refreshInterval: 30s
-          CR
-
-          # Give the operator a few reconcile cycles to update status.
-          for i in $(seq 1 30); do
-            ready=$(kubectl -n demo get ferrflowsecret web-env -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "")
-            reason=$(kubectl -n demo get ferrflowsecret web-env -o jsonpath='{.status.conditions[?(@.type=="Ready")].reason}' 2>/dev/null || echo "")
-            echo "[${i}/30] Ready=${ready:-<unset>} Reason=${reason:-<unset>}"
-            if [ "$ready" = "False" ] && [ -n "$reason" ]; then
-              echo "Reconciler reached the failure branch as expected â€” good."
-              exit 0
-            fi
-            sleep 5
-          done
-
-          echo "Timed out waiting for Ready=False â€” reconciler may be stuck."
-          kubectl -n demo describe ferrflowsecret web-env
-          kubectl logs -n ferrvault-operator-system -l app.kubernetes.io/name=ferrvault-operator --tail=200
-          exit 1
-
-      - name: Apply a ferrvault.com CR pointing at a non-existent FerrVault and watch the reconciler fail gracefully
-        if: steps.gate.outputs.has_go == 'true'
-        # Mirrors the ferrflow.io smoke test for the new ferrvault.com path:
-        # exercises the FerrVaultConnection/FerrVaultSecret reconcilers, their
-        # apiGroups: ["ferrvault.com"] RBAC rules, and the SAT reveal branch.
         run: |
           kubectl create namespace demo-fv
           kubectl -n demo-fv create secret generic ferrvault-sat \
@@ -214,7 +159,5 @@ jobs:
           kubectl get pods -n ferrvault-operator-system -o wide || true
           echo "=== manager logs ==="
           kubectl logs -n ferrvault-operator-system -l app.kubernetes.io/name=ferrvault-operator --tail=500 || true
-          echo "=== events in demo ==="
-          kubectl get events -n demo --sort-by=.lastTimestamp || true
           echo "=== events in demo-fv ==="
           kubectl get events -n demo-fv --sort-by=.lastTimestamp || true

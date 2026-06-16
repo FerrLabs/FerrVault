@@ -3,8 +3,6 @@ package v1alpha1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-
-	ffv1alpha1 "github.com/FerrLabs/FerrVault/api/v1alpha1"
 )
 
 // +kubebuilder:object:root=true
@@ -19,8 +17,8 @@ type FerrVaultConnection struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ffv1alpha1.FerrFlowConnectionSpec   `json:"spec,omitempty"`
-	Status ffv1alpha1.FerrFlowConnectionStatus `json:"status,omitempty"`
+	Spec   ConnectionSpec   `json:"spec,omitempty"`
+	Status ConnectionStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -32,10 +30,7 @@ type FerrVaultConnectionList struct {
 }
 
 func (in *FerrVaultConnection) ResolvedMode() string {
-	if in.Spec.Mode == "" {
-		return ffv1alpha1.ModeFerrVault
-	}
-	return in.Spec.Mode
+	return in.Spec.ResolvedMode()
 }
 
 func (in *FerrVaultConnection) DeepCopyInto(out *FerrVaultConnection) {

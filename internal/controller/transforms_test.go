@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	ffv1alpha1 "github.com/FerrLabs/FerrVault/api/v1alpha1"
+	fvv1alpha1 "github.com/FerrLabs/FerrVault/api/ferrvault/v1alpha1"
 )
 
 // Tests exercise ApplyTransforms against the minimum set of behaviours we
@@ -34,7 +34,7 @@ func TestApplyTransforms_NilAndEmpty(t *testing.T) {
 
 func TestApplyTransforms_Prefix(t *testing.T) {
 	in := map[string]string{"DB_URL": "x", "API_KEY": "y"}
-	out, err := ApplyTransforms(in, []ffv1alpha1.SecretTransform{
+	out, err := ApplyTransforms(in, []fvv1alpha1.SecretTransform{
 		{Type: TransformPrefix, Value: "APP_"},
 	})
 	if err != nil {
@@ -48,7 +48,7 @@ func TestApplyTransforms_Prefix(t *testing.T) {
 
 func TestApplyTransforms_Suffix(t *testing.T) {
 	in := map[string]string{"DB_URL": "x"}
-	out, err := ApplyTransforms(in, []ffv1alpha1.SecretTransform{
+	out, err := ApplyTransforms(in, []fvv1alpha1.SecretTransform{
 		{Type: TransformSuffix, Value: "_V2"},
 	})
 	if err != nil {
@@ -62,7 +62,7 @@ func TestApplyTransforms_Suffix(t *testing.T) {
 func TestApplyTransforms_RenameMissingKeyIsNoop(t *testing.T) {
 	// Upstream removing a key shouldn't break the sync.
 	in := map[string]string{"A": "1"}
-	out, err := ApplyTransforms(in, []ffv1alpha1.SecretTransform{
+	out, err := ApplyTransforms(in, []fvv1alpha1.SecretTransform{
 		{Type: TransformRename, From: "MISSING", To: "NEW"},
 	})
 	if err != nil {
@@ -77,7 +77,7 @@ func TestApplyTransforms_RenameCollision(t *testing.T) {
 	// Projecting A -> B when B already exists is ambiguous — fail loudly
 	// rather than silently picking a winner.
 	in := map[string]string{"A": "1", "B": "2"}
-	_, err := ApplyTransforms(in, []ffv1alpha1.SecretTransform{
+	_, err := ApplyTransforms(in, []fvv1alpha1.SecretTransform{
 		{Type: TransformRename, From: "A", To: "B"},
 	})
 	if err == nil {
@@ -93,7 +93,7 @@ func TestApplyTransforms_RenameCollision(t *testing.T) {
 }
 
 func TestApplyTransforms_RenameRequiresBothFields(t *testing.T) {
-	_, err := ApplyTransforms(map[string]string{"A": "1"}, []ffv1alpha1.SecretTransform{
+	_, err := ApplyTransforms(map[string]string{"A": "1"}, []fvv1alpha1.SecretTransform{
 		{Type: TransformRename, From: "A"},
 	})
 	if err == nil {
@@ -107,7 +107,7 @@ func TestApplyTransforms_Base64DecodeSelected(t *testing.T) {
 		"SECRET":    encoded,
 		"PLAINTEXT": "untouched",
 	}
-	out, err := ApplyTransforms(in, []ffv1alpha1.SecretTransform{
+	out, err := ApplyTransforms(in, []fvv1alpha1.SecretTransform{
 		{Type: TransformBase64Decode, Keys: []string{"SECRET"}},
 	})
 	if err != nil {
@@ -126,7 +126,7 @@ func TestApplyTransforms_Base64DecodeAll(t *testing.T) {
 		"A": base64.StdEncoding.EncodeToString([]byte("foo")),
 		"B": base64.StdEncoding.EncodeToString([]byte("bar")),
 	}
-	out, err := ApplyTransforms(in, []ffv1alpha1.SecretTransform{
+	out, err := ApplyTransforms(in, []fvv1alpha1.SecretTransform{
 		{Type: TransformBase64Decode},
 	})
 	if err != nil {
@@ -139,7 +139,7 @@ func TestApplyTransforms_Base64DecodeAll(t *testing.T) {
 
 func TestApplyTransforms_Base64DecodeInvalid(t *testing.T) {
 	in := map[string]string{"A": "!!!not-base64!!!"}
-	_, err := ApplyTransforms(in, []ffv1alpha1.SecretTransform{
+	_, err := ApplyTransforms(in, []fvv1alpha1.SecretTransform{
 		{Type: TransformBase64Decode, Keys: []string{"A"}},
 	})
 	if err == nil {
@@ -155,7 +155,7 @@ func TestApplyTransforms_JSONExpand(t *testing.T) {
 		"CONFIG_JSON": `{"db":{"host":"pg","port":5432},"debug":true,"name":"svc"}`,
 		"OTHER":       "keep",
 	}
-	out, err := ApplyTransforms(in, []ffv1alpha1.SecretTransform{
+	out, err := ApplyTransforms(in, []fvv1alpha1.SecretTransform{
 		{Type: TransformJSONExpand, Key: "CONFIG_JSON"},
 	})
 	if err != nil {
@@ -180,7 +180,7 @@ func TestApplyTransforms_JSONExpandNonObject(t *testing.T) {
 	// Top-level must be an object — arrays and scalars have no natural
 	// key/value fan-out.
 	in := map[string]string{"LIST": `[1,2,3]`}
-	_, err := ApplyTransforms(in, []ffv1alpha1.SecretTransform{
+	_, err := ApplyTransforms(in, []fvv1alpha1.SecretTransform{
 		{Type: TransformJSONExpand, Key: "LIST"},
 	})
 	if err == nil {
@@ -190,7 +190,7 @@ func TestApplyTransforms_JSONExpandNonObject(t *testing.T) {
 
 func TestApplyTransforms_JSONExpandMissingKeyIsNoop(t *testing.T) {
 	in := map[string]string{"A": "1"}
-	out, err := ApplyTransforms(in, []ffv1alpha1.SecretTransform{
+	out, err := ApplyTransforms(in, []fvv1alpha1.SecretTransform{
 		{Type: TransformJSONExpand, Key: "MISSING"},
 	})
 	if err != nil {
@@ -208,7 +208,7 @@ func TestApplyTransforms_JSONExpandCollision(t *testing.T) {
 		"FOO":     `{"BAR":"new"}`,
 		"FOO_BAR": "existing",
 	}
-	_, err := ApplyTransforms(in, []ffv1alpha1.SecretTransform{
+	_, err := ApplyTransforms(in, []fvv1alpha1.SecretTransform{
 		{Type: TransformJSONExpand, Key: "FOO"},
 	})
 	if err == nil {
@@ -225,7 +225,7 @@ func TestApplyTransforms_Composition(t *testing.T) {
 		"STRIPE_KEY":   encoded,
 		"CONFIG_JSON":  `{"region":"eu-west"}`,
 	}
-	out, err := ApplyTransforms(in, []ffv1alpha1.SecretTransform{
+	out, err := ApplyTransforms(in, []fvv1alpha1.SecretTransform{
 		{Type: TransformRename, From: "DATABASE_URL", To: "DB_URL"},
 		{Type: TransformBase64Decode, Keys: []string{"STRIPE_KEY"}},
 		{Type: TransformJSONExpand, Key: "CONFIG_JSON"},
@@ -250,7 +250,7 @@ func TestApplyTransforms_Composition(t *testing.T) {
 }
 
 func TestApplyTransforms_UnknownType(t *testing.T) {
-	_, err := ApplyTransforms(map[string]string{"A": "1"}, []ffv1alpha1.SecretTransform{
+	_, err := ApplyTransforms(map[string]string{"A": "1"}, []fvv1alpha1.SecretTransform{
 		{Type: "encrypt"},
 	})
 	if err == nil {
@@ -265,7 +265,7 @@ func TestApplyTransforms_ErrorCarriesIndex(t *testing.T) {
 	// A failing transform at index 2 must surface that index so the user
 	// can pinpoint the bad entry in `spec.transforms`.
 	in := map[string]string{"A": "valid", "B": "!!bad"}
-	_, err := ApplyTransforms(in, []ffv1alpha1.SecretTransform{
+	_, err := ApplyTransforms(in, []fvv1alpha1.SecretTransform{
 		{Type: TransformPrefix, Value: "X_"},
 		{Type: TransformSuffix, Value: "_Y"},
 		{Type: TransformBase64Decode, Keys: []string{"X_B_Y"}},
@@ -286,7 +286,7 @@ func TestApplyTransforms_JSONExpandNested(t *testing.T) {
 	in := map[string]string{
 		"C": `{"a":{"b":{"c":"deep"}}}`,
 	}
-	out, err := ApplyTransforms(in, []ffv1alpha1.SecretTransform{
+	out, err := ApplyTransforms(in, []fvv1alpha1.SecretTransform{
 		{Type: TransformJSONExpand, Key: "C"},
 	})
 	if err != nil {

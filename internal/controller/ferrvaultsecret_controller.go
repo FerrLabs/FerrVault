@@ -18,7 +18,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	fvv1alpha1 "github.com/FerrLabs/FerrVault/api/ferrvault/v1alpha1"
-	ffv1alpha1 "github.com/FerrLabs/FerrVault/api/v1alpha1"
 	"github.com/FerrLabs/FerrVault/internal/ferrvault"
 )
 
@@ -104,7 +103,7 @@ func (r *FerrVaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	var reveal *ferrvault.BulkRevealResponse
 	switch conn.ResolvedMode() {
-	case ffv1alpha1.ModeFerrVault:
+	case fvv1alpha1.ModeFerrVault:
 		reveal, err = ffc.RevealFromVault(ctx, cr.Spec.Vault, cr.Spec.Selector.Names)
 	default:
 		reveal, err = ffc.BulkReveal(

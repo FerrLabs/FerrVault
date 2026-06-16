@@ -1,18 +1,18 @@
 // Package controller — token broker.
 //
-// Central resolver for the bearer token the operator presents on FerrFlow
+// Central resolver for the bearer token the operator presents on FerrVault
 // API calls. Two modes:
 //
 //   - **tokenSecretRef** — long-lived `ffclust_` / `fft_` stored in a k8s
 //     Secret. Direct read-through, no caching beyond what the client cache
 //     already does on the Secret.
 //   - **oidc** — projected ServiceAccount token exchanged for a short-lived
-//     `ffclust_` via FerrFlow's `POST /clusters/oidc-exchange`. Cached with
+//     `ffclust_` via FerrVault's `POST /clusters/oidc-exchange`. Cached with
 //     a 60-second early-refresh window so we never hand out a token that's
 //     about to expire mid-request.
 //
-// The broker is shared between both reconcilers (FerrFlowSecret and
-// FerrFlowConnection) so they don't duplicate the resolution logic or the
+// The broker is shared between both reconcilers (FerrVaultSecret and
+// FerrVaultConnection) so they don't duplicate the resolution logic or the
 // OIDC cache.
 
 package controller
@@ -29,12 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	ffv1alpha1 "github.com/FerrLabs/FerrVault/api/v1alpha1"
+	fvv1alpha1 "github.com/FerrLabs/FerrVault/api/ferrvault/v1alpha1"
 	"github.com/FerrLabs/FerrVault/internal/ferrvault"
 )
 
 // oidcRefreshLeeway is how early (before expiry) we refresh the cached
-// bearer. Matches the FerrFlow JWT leeway on the server side so clients
+// bearer. Matches the FerrVault JWT leeway on the server side so clients
 // don't present a token that's one clock-skew-tick past valid.
 const oidcRefreshLeeway = 60 * time.Second
 
@@ -45,11 +45,11 @@ const oidcRefreshLeeway = 60 * time.Second
 type tokenReader func(path string) (string, error)
 
 // oidcExchanger is the per-connection client function that posts an SA JWT
-// to FerrFlow and returns a short-lived bearer + its expiry. Abstracted so
+// to FerrVault and returns a short-lived bearer + its expiry. Abstracted so
 // tests don't need to spin up an HTTP server.
 type oidcExchanger func(ctx context.Context, baseURL, clusterID, saToken string) (string, time.Time, error)
 
-// TokenBroker resolves bearer tokens for FerrFlowConnections. Safe for
+// TokenBroker resolves bearer tokens for FerrVaultConnections. Safe for
 // concurrent use by both reconcilers.
 //
 // The OIDC cache is keyed by `(namespace, connection name)` — two
@@ -63,7 +63,7 @@ type TokenBroker struct {
 	// nil to use the default (`os.ReadFile`).
 	ReadToken tokenReader
 
-	// Exchange is the HTTP POST to FerrFlow's `/clusters/oidc-exchange`.
+	// Exchange is the HTTP POST to FerrVault's `/clusters/oidc-exchange`.
 	// Set to nil to use the real ferrvault.Client. Tests inject fakes.
 	Exchange oidcExchanger
 
@@ -81,7 +81,7 @@ type cachedBearer struct {
 	expiresAt time.Time
 }
 
-// NewTokenBroker builds a broker wired to the real filesystem and FerrFlow
+// NewTokenBroker builds a broker wired to the real filesystem and FerrVault
 // HTTP client. Test code should construct `TokenBroker{...}` directly and
 // fill the `ReadToken` / `Exchange` hooks.
 func NewTokenBroker(c client.Client) *TokenBroker {
@@ -104,7 +104,7 @@ func readFileString(path string) (string, error) {
 }
 
 // TokenFor resolves the bearer for a connection. Called on every reconcile
-// that needs to hit the FerrFlow API.
+// that needs to hit the FerrVault API.
 //
 // Returns an error when:
 //   - Neither `tokenSecretRef` nor `oidc` is set (spec validation failure).
@@ -113,16 +113,16 @@ func readFileString(path string) (string, error) {
 //     token file missing, exchange rejected).
 func (b *TokenBroker) TokenFor(
 	ctx context.Context,
-	conn *ffv1alpha1.FerrFlowConnection,
+	conn *fvv1alpha1.FerrVaultConnection,
 ) (string, error) {
 	hasToken := conn.Spec.TokenSecretRef != nil
 	hasOIDC := conn.Spec.OIDC != nil
 	switch {
 	case !hasToken && !hasOIDC:
-		return "", fmt.Errorf("FerrFlowConnection %s/%s: set either tokenSecretRef or oidc",
+		return "", fmt.Errorf("FerrVaultConnection %s/%s: set either tokenSecretRef or oidc",
 			conn.Namespace, conn.Name)
 	case hasToken && hasOIDC:
-		return "", fmt.Errorf("FerrFlowConnection %s/%s: set only one of tokenSecretRef or oidc, not both",
+		return "", fmt.Errorf("FerrVaultConnection %s/%s: set only one of tokenSecretRef or oidc, not both",
 			conn.Namespace, conn.Name)
 	case hasToken:
 		return b.loadFromSecret(ctx, conn)
@@ -133,7 +133,7 @@ func (b *TokenBroker) TokenFor(
 
 func (b *TokenBroker) loadFromSecret(
 	ctx context.Context,
-	conn *ffv1alpha1.FerrFlowConnection,
+	conn *fvv1alpha1.FerrVaultConnection,
 ) (string, error) {
 	ref := conn.Spec.TokenSecretRef
 	var tokenSecret corev1.Secret
@@ -154,7 +154,7 @@ func (b *TokenBroker) loadFromSecret(
 
 func (b *TokenBroker) loadFromOIDC(
 	ctx context.Context,
-	conn *ffv1alpha1.FerrFlowConnection,
+	conn *fvv1alpha1.FerrVaultConnection,
 ) (string, error) {
 	// Cache hit? Skip the disk read + HTTP exchange entirely.
 	if cached := b.cacheGet(conn); cached != nil {
@@ -166,7 +166,7 @@ func (b *TokenBroker) loadFromOIDC(
 	// itself.
 	path := conn.Spec.OIDC.TokenPath
 	if path == "" {
-		path = ffv1alpha1.DefaultTokenPath
+		path = fvv1alpha1.DefaultTokenPath
 	}
 	saToken, err := b.ReadToken(path)
 	if err != nil {
@@ -185,7 +185,7 @@ func (b *TokenBroker) loadFromOIDC(
 	return bearer, nil
 }
 
-func (b *TokenBroker) cacheGet(conn *ffv1alpha1.FerrFlowConnection) *string {
+func (b *TokenBroker) cacheGet(conn *fvv1alpha1.FerrVaultConnection) *string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.cache == nil {
@@ -207,7 +207,7 @@ func (b *TokenBroker) cacheGet(conn *ffv1alpha1.FerrFlowConnection) *string {
 }
 
 func (b *TokenBroker) cachePut(
-	conn *ffv1alpha1.FerrFlowConnection,
+	conn *fvv1alpha1.FerrVaultConnection,
 	token string,
 	expiresAt time.Time,
 ) {

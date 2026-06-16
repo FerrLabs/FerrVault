@@ -3,14 +3,14 @@
 # only the volume + volumeMount are strictly required; the rest is here
 # for context.
 #
-# The audience MUST match what FerrFlow expects (`https://ferrflow.com` by
-# default). If you override it in `FerrFlowConnection.spec.oidc.audience`,
+# The audience MUST match what FerrVault expects (`https://ferrflow.com` by
+# default). If you override it in `FerrVaultConnection.spec.oidc.audience`,
 # keep both sides in sync.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ferrvault-operator
-  namespace: ferrflow-system
+  namespace: ferrvault-system
 spec:
   template:
     spec:
@@ -19,11 +19,11 @@ spec:
         - name: manager
           image: ghcr.io/ferrlabs/ferrvault-operator:latest
           volumeMounts:
-            - name: ferrflow-token
-              mountPath: /var/run/secrets/ferrflow
+            - name: ferrvault-token
+              mountPath: /var/run/secrets/ferrvault
               readOnly: true
       volumes:
-        - name: ferrflow-token
+        - name: ferrvault-token
           projected:
             sources:
               - serviceAccountToken:

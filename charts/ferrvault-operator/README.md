@@ -1,6 +1,6 @@
 # ferrvault-operator
 
-Helm chart for the [ferrvault-operator](https://github.com/FerrLabs/FerrVault) — a Kubernetes operator that syncs secrets from a FerrFlow instance into native `Secret` resources.
+Helm chart for the [ferrvault-operator](https://github.com/FerrLabs/FerrVault) — a Kubernetes operator that syncs secrets from a FerrVault instance into native `Secret` resources.
 
 ## Install
 
@@ -24,7 +24,7 @@ helm upgrade ferrvault-operator oci://ghcr.io/ferrlabs/charts/ferrvault-operator
   --namespace ferrvault-operator-system
 ```
 
-CRDs carry the `helm.sh/resource-policy: keep` annotation by default so an upgrade or uninstall never deletes your `FerrFlowSecret` / `FerrFlowConnection` CRs (and the Kubernetes Secrets they own). If you want CRD changes applied, set `crds.keep=false` before upgrading.
+CRDs carry the `helm.sh/resource-policy: keep` annotation by default so an upgrade or uninstall never deletes your `FerrVaultSecret` / `FerrVaultConnection` CRs (and the Kubernetes Secrets they own). If you want CRD changes applied, set `crds.keep=false` before upgrading.
 
 ## Uninstall
 
@@ -35,7 +35,7 @@ helm uninstall ferrvault-operator --namespace ferrvault-operator-system
 CRDs survive. To remove them (and every CR + managed Secret they own), do it deliberately:
 
 ```bash
-kubectl delete crd ferrflowsecrets.ferrflow.io ferrflowconnections.ferrflow.io
+kubectl delete crd ferrvaultsecrets.ferrvault.com ferrvaultconnections.ferrvault.com
 ```
 
 ## Values
@@ -48,9 +48,9 @@ kubectl delete crd ferrflowsecrets.ferrflow.io ferrflowconnections.ferrflow.io
 | `imagePullSecrets` | `[]` | For private registries. |
 | `replicaCount` | `1` | Raise when using leader election for HA. |
 | `leaderElection.enabled` | `true` | |
-| `leaderElection.id` | `ferrvault-operator.ferrflow.io` | Change to run multiple isolated instances in one cluster. |
+| `leaderElection.id` | `ferrvault-operator.ferrvault.com` | Change to run multiple isolated instances in one cluster. |
 | `watchNamespace` | `""` (cluster-wide) | Single namespace scope when set. |
-| `defaultRefreshInterval` | `1h` | Fallback for `FerrFlowSecret.spec.refreshInterval`. |
+| `defaultRefreshInterval` | `1h` | Fallback for `FerrVaultSecret.spec.refreshInterval`. |
 | `logLevel` | `info` | `debug`, `info`, `warn`, `error`. |
 | `extraArgs` | `[]` | Extra manager CLI flags. |
 | `metrics.enabled` | `true` | |
@@ -79,26 +79,26 @@ Once the chart is installed, create a token Secret, a Connection, and a Secret:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: ferrflow-api-token
+  name: ferrvault-api-token
   namespace: default
 type: Opaque
 stringData:
   token: fft_replace_me
 ---
-apiVersion: ferrflow.io/v1alpha1
-kind: FerrFlowConnection
+apiVersion: ferrvault.com/v1alpha1
+kind: FerrVaultConnection
 metadata:
   name: prod
   namespace: default
 spec:
-  url: https://ferrflow.example.com
+  url: https://ferrvault.example.com
   organization: acme
   tokenSecretRef:
-    name: ferrflow-api-token
+    name: ferrvault-api-token
     key: token
 ---
-apiVersion: ferrflow.io/v1alpha1
-kind: FerrFlowSecret
+apiVersion: ferrvault.com/v1alpha1
+kind: FerrVaultSecret
 metadata:
   name: web-env
   namespace: default
@@ -113,10 +113,10 @@ spec:
   refreshInterval: 30m
 ```
 
-Watch the `FerrFlowSecret` reconcile and the target Secret appear:
+Watch the `FerrVaultSecret` reconcile and the target Secret appear:
 
 ```bash
-kubectl get ferrflowsecret web-env -n default -o yaml
+kubectl get ferrvaultsecret web-env -n default -o yaml
 kubectl get secret web-env -n default -o yaml
 ```
 
