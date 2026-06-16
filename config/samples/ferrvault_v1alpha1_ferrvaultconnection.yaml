@@ -16,4 +16,4 @@ metadata:
   namespace: my-app
 type: Opaque
 stringData:
-  token: sat_REPLACE_ME_WITH_VALUE_FROM_FERRVAULT_UI
+  token: fvsat_REPLACE_ME_WITH_VALUE_FROM_FERRVAULT_UI

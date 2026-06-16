@@ -20,7 +20,7 @@ type ConnectionSpec struct {
 	//     Auth via `tokenSecretRef` (`ffclust_…` / `fft_…`) or `oidc`.
 	//
 	//   - `ferrvault` — new FerrVault SaaS, flat `/v1/operator/secrets/reveal`
-	//     surface. Auth via a Service-Account Token (`sat_…`) bound to a
+	//     surface. Auth via a Service-Account Token (`fvsat_…`) bound to a
 	//     specific vault. `organization` is ignored; the `project` field on
 	//     each secret is ignored too — the SAT scopes everything.
 	//
@@ -91,8 +91,11 @@ type OIDCAuth struct {
 	TokenPath string `json:"tokenPath,omitempty"`
 
 	// Audience the projected ServiceAccount token declares in its `aud`
-	// claim. Must match `EXPECTED_AUDIENCE` on the FerrVault side
-	// (`https://ferrflow.com`). Defaults to that value when omitted.
+	// claim. Must match the audience the target API is configured to
+	// expect: for `ferrvault` mode, the FerrVault API's
+	// `FERRVAULT_JWT_AUDIENCE` (unset there = no audience check); for
+	// `cloud` mode, the FerrFlow API's expected audience. Leave empty
+	// when the target performs no audience validation.
 	//
 	// +optional
 	Audience string `json:"audience,omitempty"`
@@ -108,10 +111,6 @@ const (
 // sample Deployment. Exposed so both the controllers and the chart share
 // a single source of truth.
 const DefaultTokenPath = "/var/run/secrets/ferrvault/token"
-
-// DefaultAudience matches the FerrVault API's `EXPECTED_AUDIENCE` constant.
-// Changing this is a coordinated breaking change across both repos.
-const DefaultAudience = "https://ferrflow.com"
 
 // ResolvedMode returns the effective Mode for the connection spec, applying
 // the `ferrvault` default for empty values so callers don't have to repeat it.
