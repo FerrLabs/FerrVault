@@ -1,0 +1,32 @@
+{
+  "$schema": "https://ferrflow.com/schema/ferrflow.json",
+  "workspace": {
+    "tagTemplate": "v{version}"
+  },
+  "package": [
+    {
+      "name": "ferrvault-operator",
+      "path": ".",
+      "versionedFiles": [
+        { "path": "go.mod", "format": "gomod" }
+      ],
+      "publishers": [
+        {
+          "kind": "docker",
+          "image": "ghcr.io/ferrlabs/ferrvault-operator",
+          "tags": ["{version}", "v{major}", "latest"],
+          "platforms": ["linux/amd64", "linux/arm64"],
+          "args": [
+            "--label", "org.opencontainers.image.source=https://github.com/FerrLabs/FerrVault",
+            "--label", "org.opencontainers.image.licenses=MPL-2.0"
+          ]
+        },
+        {
+          "kind": "helm",
+          "chart": "charts/ferrvault-operator",
+          "registry": "oci://ghcr.io/ferrlabs/charts"
+        }
+      ]
+    }
+  ]
+}
