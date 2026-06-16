@@ -1,19 +1,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "ferrflow-operator.fullname" . }}
+  name: {{ include "ferrvault-operator.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "ferrflow-operator.labels" . | nindent 4 }}
+    {{- include "ferrvault-operator.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "ferrflow-operator.selectorLabels" . | nindent 6 }}
+      {{- include "ferrvault-operator.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "ferrflow-operator.selectorLabels" . | nindent 8 }}
+        {{- include "ferrvault-operator.selectorLabels" . | nindent 8 }}
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -22,7 +22,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
-      serviceAccountName: {{ include "ferrflow-operator.serviceAccountName" . }}
+      serviceAccountName: {{ include "ferrvault-operator.serviceAccountName" . }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -31,7 +31,7 @@ spec:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: manager
-          image: "{{ .Values.image.repository }}:{{ include "ferrflow-operator.imageTag" . }}"
+          image: "{{ .Values.image.repository }}:{{ include "ferrvault-operator.imageTag" . }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
             - --metrics-bind-address=:{{ .Values.metrics.port }}

@@ -1,4 +1,4 @@
-ferrflow-operator {{ .Chart.AppVersion }} has been installed in namespace {{ .Release.Namespace }}.
+ferrvault-operator {{ .Chart.AppVersion }} has been installed in namespace {{ .Release.Namespace }}.
 
 Next steps:
 
@@ -42,15 +42,15 @@ Next steps:
 
    kubectl get ferrflowsecrets,secrets -n default
    kubectl describe ferrflowsecret web-env -n default
-   kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name={{ include "ferrflow-operator.name" . }} -f
+   kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name={{ include "ferrvault-operator.name" . }} -f
 
 {{- if not .Values.crds.install }}
 
 CRDs were NOT installed by this chart (`crds.install=false`). Apply them
 manually before creating any FerrFlow CRs:
 
-   kubectl apply -f https://raw.githubusercontent.com/FerrLabs/FerrFlow-Operator/v{{ .Chart.AppVersion }}/charts/ferrflow-operator/crds/
+   kubectl apply -f https://raw.githubusercontent.com/FerrLabs/FerrVault-Operator/v{{ .Chart.AppVersion }}/charts/ferrvault-operator/crds/
 {{- end }}
 
 Documentation: https://ferrflow.com/docs
-Repository:    https://github.com/FerrLabs/FerrFlow-Operator
+Repository:    https://github.com/FerrLabs/FerrVault

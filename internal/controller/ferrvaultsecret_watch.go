@@ -7,7 +7,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	fvv1alpha1 "github.com/FerrLabs/FerrFlow-Operator/api/ferrvault/v1alpha1"
+	fvv1alpha1 "github.com/FerrLabs/FerrVault/api/ferrvault/v1alpha1"
 )
 
 func (r *FerrVaultSecretReconciler) secretsReferencingConnection(

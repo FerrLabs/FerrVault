@@ -1,4 +1,4 @@
-// Command manager is the entry point for the ferrflow-operator binary.
+// Command manager is the entry point for the ferrvault-operator binary.
 //
 // It stands up a controller-runtime Manager, registers the CRD types in the
 // scheme, wires the FerrFlowSecret reconciler in, and blocks on the
@@ -20,9 +20,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	fvv1alpha1 "github.com/FerrLabs/FerrFlow-Operator/api/ferrvault/v1alpha1"
-	ffv1alpha1 "github.com/FerrLabs/FerrFlow-Operator/api/v1alpha1"
-	"github.com/FerrLabs/FerrFlow-Operator/internal/controller"
+	fvv1alpha1 "github.com/FerrLabs/FerrVault/api/ferrvault/v1alpha1"
+	ffv1alpha1 "github.com/FerrLabs/FerrVault/api/v1alpha1"
+	"github.com/FerrLabs/FerrVault/internal/controller"
 )
 
 var (
@@ -53,7 +53,7 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Only a single replica processes CRs when enabled.")
-	flag.StringVar(&leaderElectionID, "leader-elect-id", "ferrflow-operator.ferrflow.io",
+	flag.StringVar(&leaderElectionID, "leader-elect-id", "ferrvault-operator.ferrflow.io",
 		"Resource name used for the leader-election lease.")
 	flag.DurationVar(&defaultRefreshInterval, "default-refresh-interval", time.Hour,
 		"Fallback refresh interval used when a FerrFlowSecret omits spec.refreshInterval.")

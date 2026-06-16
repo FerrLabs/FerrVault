@@ -1,5 +1,5 @@
 apiVersion: v2
-name: ferrflow-operator
+name: ferrvault-operator
 description: Kubernetes operator that syncs secrets from the FerrFlow API into native Kubernetes Secrets.
 type: application
 
@@ -13,7 +13,7 @@ kubeVersion: ">=1.28.0-0"
 
 home: https://ferrflow.com
 sources:
-  - https://github.com/FerrLabs/FerrFlow-Operator
+  - https://github.com/FerrLabs/FerrVault
 keywords:
   - ferrflow
   - secrets
@@ -31,4 +31,4 @@ annotations:
     - name: Documentation
       url: https://ferrflow.com/docs
     - name: Source
-      url: https://github.com/FerrLabs/FerrFlow-Operator
+      url: https://github.com/FerrLabs/FerrVault

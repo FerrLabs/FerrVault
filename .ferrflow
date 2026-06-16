@@ -6,7 +6,7 @@
   },
   "package": [
     {
-      "name": "ferrflow-operator",
+      "name": "ferrvault-operator",
       "path": ".",
       "changelog": "CHANGELOG.md",
       "versionedFiles": [

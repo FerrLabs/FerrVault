@@ -2,9 +2,9 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "ferrflow-operator.fullname" . }}
+  name: {{ include "ferrvault-operator.fullname" . }}
   labels:
-    {{- include "ferrflow-operator.labels" . | nindent 4 }}
+    {{- include "ferrvault-operator.labels" . | nindent 4 }}
 rules:
   # Full CR access for the operator's own types.
   - apiGroups: ["ferrflow.io"]

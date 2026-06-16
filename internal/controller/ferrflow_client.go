@@ -3,7 +3,7 @@ package controller
 import (
 	"context"
 
-	"github.com/FerrLabs/FerrFlow-Operator/internal/ferrflow"
+	"github.com/FerrLabs/FerrVault/internal/ferrflow"
 )
 
 // ferrflowClient is the narrow surface of the FerrFlow HTTP client the

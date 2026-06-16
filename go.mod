@@ -1,4 +1,4 @@
-module github.com/FerrLabs/FerrFlow-Operator
+module github.com/FerrLabs/FerrVault
 
 go 1.26.0
 

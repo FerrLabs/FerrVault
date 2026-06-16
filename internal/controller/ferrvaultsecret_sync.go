@@ -13,8 +13,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	fvv1alpha1 "github.com/FerrLabs/FerrFlow-Operator/api/ferrvault/v1alpha1"
-	ffv1alpha1 "github.com/FerrLabs/FerrFlow-Operator/api/v1alpha1"
+	fvv1alpha1 "github.com/FerrLabs/FerrVault/api/ferrvault/v1alpha1"
+	ffv1alpha1 "github.com/FerrLabs/FerrVault/api/v1alpha1"
 )
 
 func (r *FerrVaultSecretReconciler) loadToken(ctx context.Context, conn *fvv1alpha1.FerrVaultConnection) (string, error) {
@@ -62,7 +62,7 @@ func (r *FerrVaultSecretReconciler) ensureTargetSecret(
 		if secret.Annotations == nil {
 			secret.Annotations = map[string]string{}
 		}
-		secret.Annotations["ferrvault.com/managed-by"] = "ferrflow-operator"
+		secret.Annotations["ferrvault.com/managed-by"] = "ferrvault-operator"
 		secret.Annotations[fvAnnotationContentHash] = newHash
 		secret.StringData = data
 		secret.Data = nil
