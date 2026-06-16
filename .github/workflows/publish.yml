@@ -1,11 +1,11 @@
 name: Publish
 
-# Runs FerrFlow's docker + helm publishers (ferrflow.publish.json) after
-# FerrFlow cuts a release tag on main. The release job only versions and
-# tags; publishing lives here, where the build toolchain (buildx, helm)
-# and GHCR auth are set up — the toolchain the minimal release runner
-# doesn't carry. `ferrflow publish` resolves the released version from the
-# git tag and runs each publisher idempotently.
+# Runs the docker + helm publishers declared in `.ferrflow` after FerrFlow
+# cuts a release tag on main. `.ferrflow` carries `deferPublish: true`, so
+# the release job only versions and tags — publishing lives here, where the
+# build toolchain (buildx, helm) and GHCR auth are set up. `ferrflow publish`
+# resolves the released version from the git tag and runs each publisher
+# idempotently.
 on:
   push:
     tags:
@@ -16,9 +16,6 @@ permissions:
   contents: read
   packages: write
   id-token: write
-
-env:
-  FERRFLOW_CONFIG: ferrflow.publish.json
 
 jobs:
   publish:
