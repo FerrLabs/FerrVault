@@ -9,15 +9,15 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ferrflow-operator
+  name: ferrvault-operator
   namespace: ferrflow-system
 spec:
   template:
     spec:
-      serviceAccountName: ferrflow-operator
+      serviceAccountName: ferrvault-operator
       containers:
         - name: manager
-          image: ghcr.io/ferrlabs/ferrflow-operator:latest
+          image: ghcr.io/ferrlabs/ferrvault-operator:latest
           volumeMounts:
             - name: ferrflow-token
               mountPath: /var/run/secrets/ferrflow

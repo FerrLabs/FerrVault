@@ -3,7 +3,7 @@ package v1alpha1
 import (
 	"testing"
 
-	ffv1alpha1 "github.com/FerrLabs/FerrFlow-Operator/api/v1alpha1"
+	ffv1alpha1 "github.com/FerrLabs/FerrVault/api/v1alpha1"
 )
 
 func TestFerrVaultConnection_ResolvedModeDefaultsToFerrVault(t *testing.T) {

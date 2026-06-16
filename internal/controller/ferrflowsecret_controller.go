@@ -22,8 +22,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	ffv1alpha1 "github.com/FerrLabs/FerrFlow-Operator/api/v1alpha1"
-	"github.com/FerrLabs/FerrFlow-Operator/internal/ferrflow"
+	ffv1alpha1 "github.com/FerrLabs/FerrVault/api/v1alpha1"
+	"github.com/FerrLabs/FerrVault/internal/ferrflow"
 )
 
 // connectionRefIndexKey is the field-indexer key for
@@ -365,7 +365,7 @@ func (r *FerrFlowSecretReconciler) ensureTargetSecret(
 		if secret.Annotations == nil {
 			secret.Annotations = map[string]string{}
 		}
-		secret.Annotations["ferrflow.io/managed-by"] = "ferrflow-operator"
+		secret.Annotations["ferrflow.io/managed-by"] = "ferrvault-operator"
 		secret.Annotations[annotationContentHash] = newHash
 		// Replace StringData wholesale — we want drift correction, not merge.
 		secret.StringData = data

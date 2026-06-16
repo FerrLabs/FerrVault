@@ -1,5 +1,4 @@
 {{- if .Values.crds.install -}}
-# Source: charts/ferrflow-operator/crds/ferrflow.io_ferrflowconnections.yaml
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -8,17 +7,17 @@ metadata:
     "helm.sh/resource-policy": keep
     {{- end }}
   labels:
-    {{- include "ferrflow-operator.labels" . | nindent 4 }}
-  name: ferrflowconnections.ferrflow.io
+    {{- include "ferrvault-operator.labels" . | nindent 4 }}
+  name: ferrvaultconnections.ferrvault.com
 spec:
-  group: ferrflow.io
+  group: ferrvault.com
   names:
-    kind: FerrFlowConnection
-    listKind: FerrFlowConnectionList
-    plural: ferrflowconnections
-    singular: ferrflowconnection
+    kind: FerrVaultConnection
+    listKind: FerrVaultConnectionList
+    plural: ferrvaultconnections
+    singular: ferrvaultconnection
     shortNames:
-      - ffc
+      - fvc
   scope: Namespaced
   versions:
     - name: v1alpha1
@@ -49,32 +48,42 @@ spec:
             metadata: { type: object }
             spec:
               type: object
-              required: [url, organization, tokenSecretRef]
+              required: [url]
+              x-kubernetes-validations:
+                - rule: "self.mode != 'ferrflow' || (has(self.organization) && self.organization != '')"
+                  message: "organization is required when mode is ferrflow"
               properties:
                 mode:
                   type: string
                   enum: [ferrflow, ferrvault]
-                  default: ferrflow
+                  default: ferrvault
                   description: |
-                    Backend API the operator talks to. `ferrflow` (default) targets the
-                    legacy `orgs/{org}/projects/{project}/vaults/by-name/{vault}` shape on
-                    FerrLabs-Cloud. `ferrvault` targets the new FerrVault SaaS
-                    `/v1/operator/secrets/reveal` endpoint and ignores `organization` +
-                    each `FerrFlowSecret.spec.project` — the SAT token scopes the call.
+                    Backend API the operator talks to. For `FerrVaultConnection`,
+                    `ferrvault` is the natural default — flat
+                    `/v1/operator/secrets/reveal` shape with a SAT token. Set to
+                    `ferrflow` only for legacy FerrLabs-Cloud reveal paths.
                 url:
                   type: string
                   pattern: '^https?://'
-                  description: Base URL of the FerrFlow API (without trailing slash).
+                  description: Base URL of the FerrVault API (without trailing slash).
                 organization:
                   type: string
-                  minLength: 1
-                  description: FerrFlow org slug this connection targets.
+                  description: FerrVault org slug. Required when mode=ferrflow; ignored when mode=ferrvault (SAT scopes the request).
                 tokenSecretRef:
                   type: object
                   required: [name, key]
                   properties:
                     name: { type: string }
                     key:  { type: string }
+                oidc:
+                  type: object
+                  required: [clusterID]
+                  properties:
+                    clusterID:
+                      type: string
+                      pattern: '^[0-9a-fA-F-]{36}$'
+                    tokenPath: { type: string }
+                    audience:  { type: string }
             status:
               type: object
               properties:

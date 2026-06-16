@@ -4,7 +4,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	ffv1alpha1 "github.com/FerrLabs/FerrFlow-Operator/api/v1alpha1"
+	ffv1alpha1 "github.com/FerrLabs/FerrVault/api/v1alpha1"
 )
 
 // +kubebuilder:object:root=true

@@ -18,9 +18,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	fvv1alpha1 "github.com/FerrLabs/FerrFlow-Operator/api/ferrvault/v1alpha1"
-	ffv1alpha1 "github.com/FerrLabs/FerrFlow-Operator/api/v1alpha1"
-	"github.com/FerrLabs/FerrFlow-Operator/internal/ferrflow"
+	fvv1alpha1 "github.com/FerrLabs/FerrVault/api/ferrvault/v1alpha1"
+	ffv1alpha1 "github.com/FerrLabs/FerrVault/api/v1alpha1"
+	"github.com/FerrLabs/FerrVault/internal/ferrflow"
 )
 
 const fvConnectionFinalizer = "ferrvault.com/connection-cleanup"

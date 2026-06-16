@@ -1,11 +1,11 @@
-# Contributing to ferrflow-operator
+# Contributing to ferrvault-operator
 
 Thanks for your interest in contributing! Here's how to get started.
 
 ## Getting Started
 
 1. Fork the repository
-2. Clone your fork: `git clone https://github.com/<your-username>/ferrflow-operator.git`
+2. Clone your fork: `git clone https://github.com/<your-username>/ferrvault-operator.git`
 3. Create a branch: `git checkout -b feat/my-feature`
 4. Make your changes
 5. Push and open a pull request
@@ -93,11 +93,11 @@ No Node toolchain required.
 
 ## Reporting Bugs
 
-Use the [bug report template](https://github.com/FerrLabs/FerrFlow-Operator/issues/new?template=bug_report.md).
+Use the [bug report template](https://github.com/FerrLabs/FerrVault/issues/new?template=bug_report.md).
 
 ## Requesting Features
 
-Use the [feature request template](https://github.com/FerrLabs/FerrFlow-Operator/issues/new?template=feature_request.md).
+Use the [feature request template](https://github.com/FerrLabs/FerrVault/issues/new?template=feature_request.md).
 
 ## Security
 

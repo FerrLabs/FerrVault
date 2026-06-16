@@ -1,9 +1,9 @@
-# Default values for ferrflow-operator.
+# Default values for ferrvault-operator.
 # Copy this file and override what you need with `-f my-values.yaml`.
 
 # --- Image ---
 image:
-  repository: ghcr.io/ferrlabs/ferrflow-operator
+  repository: ghcr.io/ferrlabs/ferrvault-operator
   # Leave tag empty to fall back to `.Chart.AppVersion`. Override for pinning
   # to a specific commit / prerelease.
   tag: ""
@@ -19,7 +19,7 @@ leaderElection:
   enabled: true
   # Lease name in the kube-system coordinated store. Change if you run several
   # independent instances of the operator in the same cluster.
-  id: ferrflow-operator.ferrflow.io
+  id: ferrvault-operator.ferrflow.io
 
 # --- Scope ---
 # Empty string = cluster-wide (operator watches every namespace). Set to a
@@ -66,7 +66,7 @@ rbac:
 crds:
   # When true (default), the chart installs the CRDs as part of the release.
   # When false, the user is expected to install CRDs separately (e.g.
-  # `kubectl apply -f charts/ferrflow-operator/crds/`). Turning off is useful
+  # `kubectl apply -f charts/ferrvault-operator/crds/`). Turning off is useful
   # in multi-tenant clusters where CRDs are managed by a dedicated operator.
   install: true
   # With `keep: true`, uninstalling the chart does NOT delete the CRDs,

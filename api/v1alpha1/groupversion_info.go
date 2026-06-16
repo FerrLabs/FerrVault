@@ -1,5 +1,5 @@
 // Package v1alpha1 holds the CRD types for ferrflow.io/v1alpha1 — the
-// FerrFlow-Operator's first API version. The `v1alpha1` suffix advertises
+// FerrVault-Operator's first API version. The `v1alpha1` suffix advertises
 // that field names and semantics may still change before we promote to v1.
 package v1alpha1
 

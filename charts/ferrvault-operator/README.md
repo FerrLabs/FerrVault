@@ -1,27 +1,27 @@
-# ferrflow-operator
+# ferrvault-operator
 
-Helm chart for the [ferrflow-operator](https://github.com/FerrLabs/FerrFlow-Operator) — a Kubernetes operator that syncs secrets from a FerrFlow instance into native `Secret` resources.
+Helm chart for the [ferrvault-operator](https://github.com/FerrLabs/FerrVault) — a Kubernetes operator that syncs secrets from a FerrFlow instance into native `Secret` resources.
 
 ## Install
 
 ```bash
-helm install ferrflow-operator oci://ghcr.io/ferrlabs/charts/ferrflow-operator \
-  --namespace ferrflow-operator-system --create-namespace
+helm install ferrvault-operator oci://ghcr.io/ferrlabs/charts/ferrvault-operator \
+  --namespace ferrvault-operator-system --create-namespace
 ```
 
 Pin to a specific version:
 
 ```bash
-helm install ferrflow-operator oci://ghcr.io/ferrlabs/charts/ferrflow-operator \
+helm install ferrvault-operator oci://ghcr.io/ferrlabs/charts/ferrvault-operator \
   --version 0.1.0 \
-  --namespace ferrflow-operator-system --create-namespace
+  --namespace ferrvault-operator-system --create-namespace
 ```
 
 ## Upgrade
 
 ```bash
-helm upgrade ferrflow-operator oci://ghcr.io/ferrlabs/charts/ferrflow-operator \
-  --namespace ferrflow-operator-system
+helm upgrade ferrvault-operator oci://ghcr.io/ferrlabs/charts/ferrvault-operator \
+  --namespace ferrvault-operator-system
 ```
 
 CRDs carry the `helm.sh/resource-policy: keep` annotation by default so an upgrade or uninstall never deletes your `FerrFlowSecret` / `FerrFlowConnection` CRs (and the Kubernetes Secrets they own). If you want CRD changes applied, set `crds.keep=false` before upgrading.
@@ -29,7 +29,7 @@ CRDs carry the `helm.sh/resource-policy: keep` annotation by default so an upgra
 ## Uninstall
 
 ```bash
-helm uninstall ferrflow-operator --namespace ferrflow-operator-system
+helm uninstall ferrvault-operator --namespace ferrvault-operator-system
 ```
 
 CRDs survive. To remove them (and every CR + managed Secret they own), do it deliberately:
@@ -42,13 +42,13 @@ kubectl delete crd ferrflowsecrets.ferrflow.io ferrflowconnections.ferrflow.io
 
 | Key | Default | Notes |
 |---|---|---|
-| `image.repository` | `ghcr.io/ferrlabs/ferrflow-operator` | |
+| `image.repository` | `ghcr.io/ferrlabs/ferrvault-operator` | |
 | `image.tag` | `""` → `Chart.AppVersion` | |
 | `image.pullPolicy` | `IfNotPresent` | |
 | `imagePullSecrets` | `[]` | For private registries. |
 | `replicaCount` | `1` | Raise when using leader election for HA. |
 | `leaderElection.enabled` | `true` | |
-| `leaderElection.id` | `ferrflow-operator.ferrflow.io` | Change to run multiple isolated instances in one cluster. |
+| `leaderElection.id` | `ferrvault-operator.ferrflow.io` | Change to run multiple isolated instances in one cluster. |
 | `watchNamespace` | `""` (cluster-wide) | Single namespace scope when set. |
 | `defaultRefreshInterval` | `1h` | Fallback for `FerrFlowSecret.spec.refreshInterval`. |
 | `logLevel` | `info` | `debug`, `info`, `warn`, `error`. |

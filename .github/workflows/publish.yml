@@ -65,9 +65,9 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/ferrlabs/ferrflow-operator:${{ needs.resolve.outputs.version }}
-            ghcr.io/ferrlabs/ferrflow-operator:v${{ needs.resolve.outputs.major }}
-            ghcr.io/ferrlabs/ferrflow-operator:latest
+            ghcr.io/ferrlabs/ferrvault-operator:${{ needs.resolve.outputs.version }}
+            ghcr.io/ferrlabs/ferrvault-operator:v${{ needs.resolve.outputs.major }}
+            ghcr.io/ferrlabs/ferrvault-operator:latest
           # Embed the git SHA and build time so `docker inspect` is useful.
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
@@ -95,17 +95,17 @@ jobs:
           # Quote both fields â€” helm lint rejects `version: 0` / `version: 1.0`
           # because unquoted they parse as int/float and the schema requires a
           # string.
-          sed -i -E "s/^version: .*/version: \"$V\"/" charts/ferrflow-operator/Chart.yaml
-          sed -i -E "s/^appVersion: .*/appVersion: \"$V\"/" charts/ferrflow-operator/Chart.yaml
+          sed -i -E "s/^version: .*/version: \"$V\"/" charts/ferrvault-operator/Chart.yaml
+          sed -i -E "s/^appVersion: .*/appVersion: \"$V\"/" charts/ferrvault-operator/Chart.yaml
           echo "--- Chart.yaml head ---"
-          head -n 15 charts/ferrflow-operator/Chart.yaml
+          head -n 15 charts/ferrvault-operator/Chart.yaml
       - name: Lint
-        run: helm lint charts/ferrflow-operator
+        run: helm lint charts/ferrvault-operator
       - name: Package
-        run: helm package charts/ferrflow-operator -d dist/
+        run: helm package charts/ferrvault-operator -d dist/
       - name: Push to GHCR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "$GH_TOKEN" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
-          helm push dist/ferrflow-operator-${{ needs.resolve.outputs.version }}.tgz oci://ghcr.io/ferrlabs/charts
+          helm push dist/ferrvault-operator-${{ needs.resolve.outputs.version }}.tgz oci://ghcr.io/ferrlabs/charts

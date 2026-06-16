@@ -1,4 +1,4 @@
-# ferrflow-operator
+# ferrvault-operator
 
 [![Latest release](https://img.shields.io/github/v/release/FerrLabs/FerrVault)](https://github.com/FerrLabs/FerrVault/releases/latest)
 [![Quality Gate](https://sonar.ferrlabs.com/api/project_badges/measure?project=FerrVault&metric=alert_status&token=sqb_d3cde9fc7a86f70e3652d22ce13b5a39522212c8)](https://sonar.ferrlabs.com/dashboard?id=FerrVault)
@@ -8,7 +8,7 @@
 
 Kubernetes operator that syncs secrets stored in [FerrFlow](https://ferrflow.com) into native Kubernetes `Secret` resources.
 
-> **Status: alpha.** The MVP reconciler is in place — it reads secrets from a FerrFlow vault via the bulk-reveal API and materialises them into a Kubernetes Secret, with owner-ref GC and status conditions. Rolling restarts, Helm chart, and integration tests are tracked in [issue #1](https://github.com/FerrLabs/FerrFlow-Operator/issues/1).
+> **Status: alpha.** The MVP reconciler is in place — it reads secrets from a FerrFlow vault via the bulk-reveal API and materialises them into a Kubernetes Secret, with owner-ref GC and status conditions. Rolling restarts, Helm chart, and integration tests are tracked in [issue #1](https://github.com/FerrLabs/FerrVault/issues/1).
 
 ## Custom resources
 
@@ -98,11 +98,11 @@ Malformed transforms (unknown type, invalid base64, non-object JSON, destination
 ### Helm (recommended)
 
 ```bash
-helm install ferrflow-operator oci://ghcr.io/ferrlabs/charts/ferrflow-operator \
-  --namespace ferrflow-operator-system --create-namespace
+helm install ferrvault-operator oci://ghcr.io/ferrlabs/charts/ferrvault-operator \
+  --namespace ferrvault-operator-system --create-namespace
 ```
 
-Upgrade: `helm upgrade` against the same release. CRDs carry `helm.sh/resource-policy: keep` so they survive uninstall (protects your CRs + managed Secrets). See [`charts/ferrflow-operator/README.md`](charts/ferrflow-operator/README.md) for the full `values.yaml` reference.
+Upgrade: `helm upgrade` against the same release. CRDs carry `helm.sh/resource-policy: keep` so they survive uninstall (protects your CRs + managed Secrets). See [`charts/ferrvault-operator/README.md`](charts/ferrvault-operator/README.md) for the full `values.yaml` reference.
 
 ### Locally against a cluster
 
@@ -118,9 +118,9 @@ ServiceAccount, Deployment). If your cluster policy forbids running Helm at
 deploy time, render once and commit/apply the plain YAML:
 
 ```bash
-kubectl create namespace ferrflow-operator-system
-helm template ferrflow-operator charts/ferrflow-operator \
-  --namespace ferrflow-operator-system \
+kubectl create namespace ferrvault-operator-system
+helm template ferrvault-operator charts/ferrvault-operator \
+  --namespace ferrvault-operator-system \
   > manager.yaml
 kubectl apply -f manager.yaml
 ```

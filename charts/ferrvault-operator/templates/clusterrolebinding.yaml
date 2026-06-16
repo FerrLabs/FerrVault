@@ -2,15 +2,15 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "ferrflow-operator.fullname" . }}
+  name: {{ include "ferrvault-operator.fullname" . }}
   labels:
-    {{- include "ferrflow-operator.labels" . | nindent 4 }}
+    {{- include "ferrvault-operator.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ include "ferrflow-operator.fullname" . }}
+  name: {{ include "ferrvault-operator.fullname" . }}
 subjects:
   - kind: ServiceAccount
-    name: {{ include "ferrflow-operator.serviceAccountName" . }}
+    name: {{ include "ferrvault-operator.serviceAccountName" . }}
     namespace: {{ .Release.Namespace }}
 {{- end }}

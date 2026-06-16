@@ -1,12 +1,12 @@
-# Basic developer tasks for ferrflow-operator.
+# Basic developer tasks for ferrvault-operator.
 #
 # This is intentionally minimal — kubebuilder-generated Makefiles pull in a
 # large zoo of helper binaries we don't need yet. We'll add codegen, envtest,
 # and release wiring as the project grows.
 
 SHELL := /usr/bin/env bash
-IMG ?= ghcr.io/ferrlabs/ferrflow-operator:dev
-CHART_DIR := charts/ferrflow-operator
+IMG ?= ghcr.io/ferrlabs/ferrvault-operator:dev
+CHART_DIR := charts/ferrvault-operator
 
 .PHONY: help
 help:
@@ -19,7 +19,7 @@ help:
 	@echo "  install-crds     Apply CRDs (rendered from the Helm chart) to the current context."
 	@echo "  uninstall-crds   Remove CRDs from the current kubectl context."
 	@echo "  run              Run the manager against the current kubectl context."
-	@echo "  helm-lint        Run 'helm lint' on charts/ferrflow-operator."
+	@echo "  helm-lint        Run 'helm lint' on charts/ferrvault-operator."
 	@echo "  helm-template    Render the chart and print to stdout (sanity check)."
 	@echo "  helm-package     Package the chart into dist/."
 	@echo "  helm-install     helm upgrade --install against the current context."
@@ -51,11 +51,11 @@ docker-build:
 # under config/.
 .PHONY: install-crds
 install-crds:
-	helm template ferrflow-operator $(CHART_DIR) --show-only templates/crd-*.yaml | kubectl apply -f -
+	helm template ferrvault-operator $(CHART_DIR) --show-only templates/crd-*.yaml | kubectl apply -f -
 
 .PHONY: uninstall-crds
 uninstall-crds:
-	helm template ferrflow-operator $(CHART_DIR) --show-only templates/crd-*.yaml | kubectl delete --ignore-not-found -f -
+	helm template ferrvault-operator $(CHART_DIR) --show-only templates/crd-*.yaml | kubectl delete --ignore-not-found -f -
 
 .PHONY: run
 run: build
@@ -69,7 +69,7 @@ helm-lint:
 
 .PHONY: helm-template
 helm-template:
-	helm template ferrflow-operator $(CHART_DIR) --debug
+	helm template ferrvault-operator $(CHART_DIR) --debug
 
 .PHONY: helm-package
 helm-package:
@@ -78,5 +78,5 @@ helm-package:
 
 .PHONY: helm-install
 helm-install:
-	helm upgrade --install ferrflow-operator $(CHART_DIR) \
-		--namespace ferrflow-operator-system --create-namespace
+	helm upgrade --install ferrvault-operator $(CHART_DIR) \
+		--namespace ferrvault-operator-system --create-namespace

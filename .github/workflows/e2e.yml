@@ -66,15 +66,15 @@ jobs:
         # `docker build` into the host daemon, then `kind load docker-image`
         # ships it straight to the kind node without a registry round-trip.
         run: |
-          docker build -t ferrflow-operator:e2e .
-          kind load docker-image ferrflow-operator:e2e --name ferrflow-e2e
+          docker build -t ferrvault-operator:e2e .
+          kind load docker-image ferrvault-operator:e2e --name ferrflow-e2e
 
       - name: Install the chart
         if: steps.gate.outputs.has_go == 'true'
         run: |
-          helm upgrade --install ferrflow-operator charts/ferrflow-operator \
-            --namespace ferrflow-operator-system --create-namespace \
-            --set image.repository=ferrflow-operator \
+          helm upgrade --install ferrvault-operator charts/ferrvault-operator \
+            --namespace ferrvault-operator-system --create-namespace \
+            --set image.repository=ferrvault-operator \
             --set image.tag=e2e \
             --set image.pullPolicy=IfNotPresent \
             --set leaderElection.enabled=false \
@@ -83,9 +83,9 @@ jobs:
       - name: Assert manager is Ready
         if: steps.gate.outputs.has_go == 'true'
         run: |
-          kubectl wait --for=condition=Available=True deployment/ferrflow-operator \
-            --namespace ferrflow-operator-system --timeout=2m
-          kubectl get pods -n ferrflow-operator-system -o wide
+          kubectl wait --for=condition=Available=True deployment/ferrvault-operator \
+            --namespace ferrvault-operator-system --timeout=2m
+          kubectl get pods -n ferrvault-operator-system -o wide
 
       - name: Assert CRDs served
         if: steps.gate.outputs.has_go == 'true'
@@ -151,7 +151,7 @@ jobs:
 
           echo "Timed out waiting for Ready=False â€” reconciler may be stuck."
           kubectl -n demo describe ferrflowsecret web-env
-          kubectl logs -n ferrflow-operator-system -l app.kubernetes.io/name=ferrflow-operator --tail=200
+          kubectl logs -n ferrvault-operator-system -l app.kubernetes.io/name=ferrvault-operator --tail=200
           exit 1
 
       - name: Apply a ferrvault.com CR pointing at a non-existent FerrVault and watch the reconciler fail gracefully
@@ -204,16 +204,16 @@ jobs:
 
           echo "Timed out waiting for Ready=False â€” FerrVaultSecret reconciler may be stuck."
           kubectl -n demo-fv describe ferrvaultsecret api-credentials
-          kubectl logs -n ferrflow-operator-system -l app.kubernetes.io/name=ferrflow-operator --tail=200
+          kubectl logs -n ferrvault-operator-system -l app.kubernetes.io/name=ferrvault-operator --tail=200
           exit 1
 
       - name: Dump operator logs on failure
         if: failure() && steps.gate.outputs.has_go == 'true'
         run: |
-          echo "=== ferrflow-operator pods ==="
-          kubectl get pods -n ferrflow-operator-system -o wide || true
+          echo "=== ferrvault-operator pods ==="
+          kubectl get pods -n ferrvault-operator-system -o wide || true
           echo "=== manager logs ==="
-          kubectl logs -n ferrflow-operator-system -l app.kubernetes.io/name=ferrflow-operator --tail=500 || true
+          kubectl logs -n ferrvault-operator-system -l app.kubernetes.io/name=ferrvault-operator --tail=500 || true
           echo "=== events in demo ==="
           kubectl get events -n demo --sort-by=.lastTimestamp || true
           echo "=== events in demo-fv ==="

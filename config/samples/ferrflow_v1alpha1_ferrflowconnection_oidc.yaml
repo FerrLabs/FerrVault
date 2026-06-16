@@ -7,7 +7,7 @@
 #   2. Register the OIDC config:
 #      PUT /orgs/:org/clusters/:id/oidc
 #      { "issuer":    "https://kubernetes.default.svc.cluster.local",
-#        "subject":   "system:serviceaccount:ferrflow-system:ferrflow-operator",
+#        "subject":   "system:serviceaccount:ferrflow-system:ferrvault-operator",
 #        "jwks_url":  "https://<api-server>/openid/v1/jwks" }
 #
 # Prerequisites (on the cluster side):
