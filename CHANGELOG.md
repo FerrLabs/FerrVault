@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [4.0.1] - 2026-06-16
+
+### Refactoring
+
+- refactor: rename internal ferrflow client package to ferrvault (#152)
+
 ## [4.0.0] - 2026-06-16
 
 ### Breaking Changes
