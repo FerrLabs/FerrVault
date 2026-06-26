@@ -11,10 +11,41 @@ const URL_KEY: &str = "api_url";
 fn open_entry(key: &str, slot: &str) -> Result<Entry> {
     static STORE: OnceLock<Result<(), String>> = OnceLock::new();
     STORE
-        .get_or_init(|| keyring::use_native_store(true).map_err(|e| e.to_string()))
+        .get_or_init(set_native_default_store)
         .as_ref()
         .map_err(|e| anyhow!("initialising OS keyring — is one installed? ({e})"))?;
     Entry::new(SERVICE, key).with_context(|| format!("opening OS keyring ({slot} slot)"))
+}
+
+fn set_native_default_store() -> Result<(), String> {
+    use std::collections::HashMap;
+    let config: HashMap<&str, &str> = HashMap::new();
+    #[cfg(target_os = "linux")]
+    {
+        let store = zbus_secret_service_keyring_store::Store::new_with_configuration(&config)
+            .map_err(|e| e.to_string())?;
+        keyring_core::set_default_store(store);
+        Ok(())
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let store = apple_native_keyring_store::keychain::Store::new_with_configuration(&config)
+            .map_err(|e| e.to_string())?;
+        keyring_core::set_default_store(store);
+        Ok(())
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let store = windows_native_keyring_store::Store::new_with_configuration(&config)
+            .map_err(|e| e.to_string())?;
+        keyring_core::set_default_store(store);
+        Ok(())
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+    {
+        let _ = config;
+        Err("no OS keyring backend is available on this platform".to_string())
+    }
 }
 
 pub struct CredentialStore;

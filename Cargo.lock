@@ -596,11 +596,11 @@ name = "ferrvault-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "apple-native-keyring-store",
  "base64",
  "chrono",
  "clap",
  "hostname",
- "keyring",
  "keyring-core",
  "reqwest",
  "rpassword",
@@ -616,6 +616,8 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "webpki-roots",
+ "windows-native-keyring-store",
+ "zbus-secret-service-keyring-store",
  "zeroize",
 ]
 
@@ -1137,18 +1139,6 @@ dependencies = [
  "cfg-if",
  "futures-util",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "keyring"
-version = "4.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ee5140534876dd3450719b506cfbb77397e640910fc39b6e7011c133291e15a"
-dependencies = [
- "apple-native-keyring-store",
- "keyring-core",
- "windows-native-keyring-store",
- "zbus-secret-service-keyring-store",
 ]
 
 [[package]]
