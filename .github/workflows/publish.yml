@@ -44,20 +44,20 @@ jobs:
           echo "Stamping chart with version $V"
           sed -i -E "s/^version: .*/version: \"$V\"/" charts/ferrvault-operator/Chart.yaml
           sed -i -E "s/^appVersion: .*/appVersion: \"$V\"/" charts/ferrvault-operator/Chart.yaml
-      - uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4
+      - uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4
       - uses: docker/setup-buildx-action@v4
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
-          version: v3.21.0
+          version: v3.21.2
       - name: Log in to GHCR for helm push
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: echo "$GH_TOKEN" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
-      - uses: FerrLabs/FerrFlow@96c29d20c1f96ce4751b012d8c31915e2baf2e3c # v5.9.0
+      - uses: FerrLabs/FerrFlow@80d4c81ac9d8fa04a8e967c4a80da2922797703e # v5.22.1
         with:
           mode: publish
