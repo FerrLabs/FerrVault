@@ -19,7 +19,7 @@ jobs:
     name: Create GitHub release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - uses: taiki-e/create-gh-release-action@v1
         with:
           prefix: cli
@@ -55,7 +55,7 @@ jobs:
             tool: cargo
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - name: Install Linux deps for keyring (native builds only — cross uses Cross.toml)
         if: runner.os == 'Linux' && matrix.tool == 'cargo'
         run: |
