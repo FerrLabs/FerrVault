@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [5.0.3] - 2026-07-24
+
+### Bug Fixes
+
+- fix(deps): update rust crate base64 to 0.23 (#198)
+
 ## [5.0.2] - 2026-06-26
 
 ### Bug Fixes
