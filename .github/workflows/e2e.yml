@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Check Go project presence
         id: gate
@@ -44,7 +44,7 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - uses: helm/kind-action@v1
+      - uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1
         if: steps.gate.outputs.has_go == 'true'
         with:
           cluster_name: ferrvault-e2e
@@ -55,7 +55,7 @@ jobs:
         if: steps.gate.outputs.has_go == 'true'
         uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
-          version: v4.2.2
+          version: v4.2.3
 
       - name: Download dependencies
         if: steps.gate.outputs.has_go == 'true'

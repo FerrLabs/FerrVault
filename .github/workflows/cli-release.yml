@@ -19,8 +19,8 @@ jobs:
     name: Create GitHub release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-      - uses: taiki-e/create-gh-release-action@v1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: taiki-e/create-gh-release-action@eba8ea96c86cca8a37f1b56e94b4d13301fba651 # v1
         with:
           prefix: cli
           title: ferrvault CLI $version
@@ -55,18 +55,18 @@ jobs:
             tool: cargo
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Install Linux deps for keyring (native builds only — cross uses Cross.toml)
         if: runner.os == 'Linux' && matrix.tool == 'cargo'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
               build-essential pkg-config libdbus-1-dev
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
         with:
-          toolchain: '1.96'
+          toolchain: '1.97'
           targets: ${{ matrix.target }}
-      - uses: taiki-e/upload-rust-binary-action@v1
+      - uses: taiki-e/upload-rust-binary-action@f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6 # v1
         with:
           bin: ferrvault
           target: ${{ matrix.target }}
