@@ -38,7 +38,7 @@ jobs:
             echo "has_go=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         if: steps.gate.outputs.has_go == 'true'
         with:
           go-version-file: go.mod
