@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [5.1.0] - 2026-07-29
+
+### Features
+
+- feat(ci): dispatch Renovate when the rebase box is ticked (#177)
+
 ## [5.0.6] - 2026-07-25
 
 ### Bug Fixes
