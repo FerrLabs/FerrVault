@@ -46,7 +46,7 @@ jobs:
           sed -i -E "s/^appVersion: .*/appVersion: \"$V\"/" charts/ferrvault-operator/Chart.yaml
       - uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
-      - uses: docker/login-action@abd2ef45e78c5afb21d64d4ca52ee8550d9572c7 # v4
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -58,6 +58,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: echo "$GH_TOKEN" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
-      - uses: FerrLabs/FerrFlow@10983b33c5b156f7c7acba1c797228dedbe7d6df # v5.46.0
+      - uses: FerrLabs/FerrFlow@b1b4e96d8baf53b7ef5f0e0273e1a06761ef9571 # v5.49.0
         with:
           mode: publish
