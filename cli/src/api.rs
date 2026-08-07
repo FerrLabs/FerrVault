@@ -75,18 +75,18 @@ impl ApiClient {
     }
 
     pub async fn me(&self) -> Result<OperatorMe> {
-        self.get_json("/v1/operator/me").await
+        self.get_json("/operator/me").await
     }
 
     pub async fn inventory(&self) -> Result<Vec<InventoryItem>> {
-        self.get_json("/v1/operator/secrets/list").await
+        self.get_json("/operator/secrets/list").await
     }
 
     pub async fn reveal(&self, vault: &str, names: Option<&[String]>) -> Result<BulkReadResponse> {
         let url = self
             .cfg
             .base_url
-            .join("/v1/operator/secrets/reveal")
+            .join("/operator/secrets/reveal")
             .context("constructing reveal URL")?;
         let body = RevealBody { vault, names };
         let resp = self
@@ -96,7 +96,7 @@ impl ApiClient {
             .json(&body)
             .send()
             .await
-            .context("POST /v1/operator/secrets/reveal")?;
+            .context("POST /operator/secrets/reveal")?;
         handle(resp).await
     }
 
@@ -109,7 +109,7 @@ impl ApiClient {
         let url = self
             .cfg
             .base_url
-            .join("/v1/operator/secrets")
+            .join("/operator/secrets")
             .context("constructing create URL")?;
         let body = serde_json::json!({ "vault": vault, "name": name, "value": value });
         let resp = self
@@ -119,7 +119,7 @@ impl ApiClient {
             .json(&body)
             .send()
             .await
-            .context("POST /v1/operator/secrets")?;
+            .context("POST /operator/secrets")?;
         handle(resp).await
     }
 
@@ -132,7 +132,7 @@ impl ApiClient {
         let url = self
             .cfg
             .base_url
-            .join(&format!("/v1/operator/secrets/{name}"))
+            .join(&format!("/operator/secrets/{name}"))
             .with_context(|| format!("constructing update URL for {name}"))?;
         let body = serde_json::json!({ "vault": vault, "value": value });
         let resp = self
@@ -142,7 +142,7 @@ impl ApiClient {
             .json(&body)
             .send()
             .await
-            .with_context(|| format!("PUT /v1/operator/secrets/{name}"))?;
+            .with_context(|| format!("PUT /operator/secrets/{name}"))?;
         handle(resp).await
     }
 
@@ -150,7 +150,7 @@ impl ApiClient {
         let mut url = self
             .cfg
             .base_url
-            .join(&format!("/v1/operator/secrets/{name}"))
+            .join(&format!("/operator/secrets/{name}"))
             .with_context(|| format!("constructing delete URL for {name}"))?;
         url.query_pairs_mut().append_pair("vault", vault);
         let resp = self
@@ -159,7 +159,7 @@ impl ApiClient {
             .bearer_auth(self.cfg.token.as_str())
             .send()
             .await
-            .with_context(|| format!("DELETE /v1/operator/secrets/{name}"))?;
+            .with_context(|| format!("DELETE /operator/secrets/{name}"))?;
         let status = resp.status();
         if status.is_success() {
             return Ok(());

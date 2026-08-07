@@ -262,8 +262,8 @@ func TestRevealFromVault_PostsBodyAndMapsHits(t *testing.T) {
 		if r.Method != http.MethodPost {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
-		if r.URL.Path != "/v1/operator/secrets/reveal" {
-			t.Errorf("expected /v1/operator/secrets/reveal, got %s", r.URL.Path)
+		if r.URL.Path != "/operator/secrets/reveal" {
+			t.Errorf("expected /operator/secrets/reveal, got %s", r.URL.Path)
 		}
 		if got := r.Header.Get("Content-Type"); got != "application/json" {
 			t.Errorf("expected Content-Type application/json, got %q", got)
