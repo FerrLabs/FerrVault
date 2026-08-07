@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [5.2.0] - 2026-08-07
+
+### Features
+
+- feat(client): suit le retrait du prefixe v1 de l'api (#209)
+
 ## [5.1.0] - 2026-07-29
 
 ### Features
