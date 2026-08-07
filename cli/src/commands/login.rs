@@ -52,7 +52,7 @@ pub async fn run(
     let me = client
         .me()
         .await
-        .context("validating token against /v1/operator/me")?;
+        .context("validating token against /operator/me")?;
 
     CredentialStore::save_url(url.as_str())?;
     CredentialStore::save_token(&token)?;

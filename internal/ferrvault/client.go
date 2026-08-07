@@ -289,7 +289,7 @@ func (c *Client) BulkReveal(
 }
 
 // vaultRevealRequest is the JSON body for FerrVault's POST
-// `/v1/operator/secrets/reveal`. `names` is optional — omit it to pull every
+// `/operator/secrets/reveal`. `names` is optional — omit it to pull every
 // secret the SAT can see in the named vault.
 type vaultRevealRequest struct {
 	Vault string   `json:"vault"`
@@ -310,7 +310,7 @@ type vaultRevealResponse struct {
 }
 
 // RevealFromVault fetches `names` from the named FerrVault vault via the new
-// `POST /v1/operator/secrets/reveal` endpoint. `names` is optional — pass an
+// `POST /operator/secrets/reveal` endpoint. `names` is optional — pass an
 // empty slice to pull every secret the SAT can see. The token is interpreted
 // as a SAT (`fvsat_…`) and bound server-side to a specific vault; `vault` here
 // must match the SAT's vault scope or the API responds 403.
@@ -318,14 +318,14 @@ type vaultRevealResponse struct {
 // The result is mapped onto `BulkRevealResponse` so the controller can stay
 // agnostic of which backend served the request. `Vault` is left zero-valued
 // because FerrVault SaaS doesn't echo a vault summary on this endpoint;
-// callers that need it can fetch it separately via `/v1/operator/me`.
+// callers that need it can fetch it separately via `/operator/me`.
 func (c *Client) RevealFromVault(
 	ctx context.Context,
 	vault string,
 	names []string,
 ) (*BulkRevealResponse, error) {
 	u := *c.baseURL
-	u.Path = strings.TrimRight(u.Path, "/") + "/v1/operator/secrets/reveal"
+	u.Path = strings.TrimRight(u.Path, "/") + "/operator/secrets/reveal"
 
 	bodyBytes, err := json.Marshal(vaultRevealRequest{Vault: vault, Names: names})
 	if err != nil {

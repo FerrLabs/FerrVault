@@ -19,7 +19,7 @@ type ConnectionSpec struct {
 	//     `orgs/{org}/projects/{project}/vaults/by-name/{vault}`.
 	//     Auth via `tokenSecretRef` (`ffclust_…` / `fft_…`) or `oidc`.
 	//
-	//   - `ferrvault` — new FerrVault SaaS, flat `/v1/operator/secrets/reveal`
+	//   - `ferrvault` — new FerrVault SaaS, flat `/operator/secrets/reveal`
 	//     surface. Auth via a Service-Account Token (`fvsat_…`) bound to a
 	//     specific vault. `organization` is ignored; the `project` field on
 	//     each secret is ignored too — the SAT scopes everything.
