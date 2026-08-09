@@ -238,6 +238,9 @@ func TestMaxAttempts1DisablesRetry(t *testing.T) {
 func TestProbe_RetriesOn5xx(t *testing.T) {
 	var calls int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/healthz" {
+			t.Errorf("expected /healthz, got %s", r.URL.Path)
+		}
 		n := atomic.AddInt32(&calls, 1)
 		if n < 2 {
 			w.WriteHeader(http.StatusServiceUnavailable)

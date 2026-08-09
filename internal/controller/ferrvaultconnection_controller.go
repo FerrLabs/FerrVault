@@ -159,7 +159,7 @@ func (r *FerrVaultConnectionReconciler) probe(
 	if err := ffc.Probe(probeCtx); err != nil {
 		return metav1.ConditionFalse, "Unreachable", err.Error()
 	}
-	return metav1.ConditionTrue, "Reachable", fmt.Sprintf("%s responded to /health", conn.Spec.URL)
+	return metav1.ConditionTrue, "Reachable", fmt.Sprintf("%s responded to /healthz", conn.Spec.URL)
 }
 
 func (r *FerrVaultConnectionReconciler) SetupWithManager(mgr ctrl.Manager) error {

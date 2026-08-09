@@ -98,7 +98,7 @@ func New(baseURL, token string, opts ...Option) (*Client, error) {
 }
 
 // Probe is a lightweight reachability check against the FerrVault API.
-// Calls `GET <baseURL>/health` (public, unauthenticated) and succeeds when
+// Calls `GET <baseURL>/healthz` (public, unauthenticated) and succeeds when
 // the response is 200 with a JSON body containing `{"status":"ok"}`.
 //
 // Deliberately does not exercise the token — auth correctness is reported
@@ -107,7 +107,7 @@ func New(baseURL, token string, opts ...Option) (*Client, error) {
 // reach this API instance at all?".
 func (c *Client) Probe(ctx context.Context) error {
 	u := *c.baseURL
-	u.Path = strings.TrimRight(u.Path, "/") + "/health"
+	u.Path = strings.TrimRight(u.Path, "/") + "/healthz"
 
 	_, err := c.doWithRetry(ctx, func() (*http.Response, error) {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
