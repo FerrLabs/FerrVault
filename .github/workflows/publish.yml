@@ -58,6 +58,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: echo "$GH_TOKEN" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
-      - uses: FerrLabs/FerrFlow@b1b4e96d8baf53b7ef5f0e0273e1a06761ef9571 # v5.49.0
+      - uses: FerrLabs/FerrFlow@5cfdaf5414698e7772c4748d146b8a5c25b38c71 # v6.1.1
         with:
           mode: publish
