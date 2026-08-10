@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [5.2.2] - 2026-08-10
+
+### Bug Fixes
+
+- fix(ci): accorde pull-requests write au job appelant les reusables (#222)
+
 ## [5.2.1] - 2026-08-09
 
 ### Bug Fixes
