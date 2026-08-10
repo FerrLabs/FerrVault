@@ -1,6 +1,7 @@
 {
   "$schema": "https://ferrflow.com/schema/ferrflow.json",
   "workspace": {
+    "releaseCommitBody": "full",
     "recoverMissedReleases": true,
     "skipCi": false,
     "deferPublish": true
