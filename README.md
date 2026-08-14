@@ -1,4 +1,11 @@
-# ferrvault-operator
+<div align="center">
+
+# FerrVault Operator
+
+**Secrets from FerrVault, as native Kubernetes Secrets.**
+
+Your workloads read a normal `Secret`. The operator keeps it in sync with the vault,<br />
+garbage-collects it with the CR, and reports drift through status conditions.
 
 [![Latest release](https://img.shields.io/github/v/release/FerrLabs/FerrVault)](https://github.com/FerrLabs/FerrVault/releases/latest)
 [![Quality Gate](https://sonar.ferrlabs.com/api/project_badges/measure?project=FerrVault&metric=alert_status&token=sqb_d3cde9fc7a86f70e3652d22ce13b5a39522212c8)](https://sonar.ferrlabs.com/dashboard?id=FerrVault)
@@ -6,9 +13,15 @@
 [![License](https://img.shields.io/github/license/FerrLabs/FerrVault)](LICENSE)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/FerrLabs/FerrVault/badge)](https://scorecard.dev/viewer/?uri=github.com/FerrLabs/FerrVault)
 
-Kubernetes operator that syncs secrets stored in [FerrVault](https://ferrvault.com) into native Kubernetes `Secret` resources.
+[ferrvault.com](https://ferrvault.com) | [FerrVault-Cloud](https://github.com/FerrLabs/FerrVault-Cloud) | [FerrLabs](https://ferrlabs.com)
 
-> **Status: alpha.** The MVP reconciler is in place — it reads secrets from a FerrVault vault via the bulk-reveal API and materialises them into a Kubernetes Secret, with owner-ref GC and status conditions. Rolling restarts, Helm chart, and integration tests are tracked in [issue #1](https://github.com/FerrLabs/FerrVault/issues/1).
+</div>
+
+> [!WARNING]
+> **Alpha.** The reconciler reads secrets from a vault through the bulk-reveal API and
+> materialises them into a Kubernetes Secret, with owner-ref GC and status conditions. Rolling
+> restarts, the Helm chart and integration tests are tracked in
+> [issue #1](https://github.com/FerrLabs/FerrVault/issues/1).
 
 ## Custom resources
 
@@ -56,7 +69,7 @@ spec:
 
 On reconciliation the operator calls `GET /api/v1/orgs/:org/projects/:project/vaults/by-name/:vault/secrets/reveal` once, writes the returned `{name: value}` map into `spec.target.name`, and sets the CR's `Ready` condition based on whether any requested keys were missing upstream.
 
-The generated Secret is owned by the CR — deleting the CR garbage-collects the Secret.
+The generated Secret is owned by the CR, so deleting the CR garbage-collects the Secret.
 
 #### Value transforms
 
@@ -91,7 +104,7 @@ Supported types:
 | `base64Decode` | `keys` (optional)   | Decodes listed keys (or all when empty) from base64.         |
 | `jsonExpand`   | `key`               | Flattens a JSON object under `<KEY>_<SUB>`. Drops the source.|
 
-Malformed transforms (unknown type, invalid base64, non-object JSON, destination-key collisions) leave the CR in `Ready=False` with `Reason=TransformError` and increment `ferrvault_secret_sync_errors_total{reason="TransformError"}`. The target Secret is not written on failure — workloads keep the last known-good value.
+Malformed transforms (unknown type, invalid base64, non-object JSON, destination-key collisions) leave the CR in `Ready=False` with `Reason=TransformError` and increment `ferrvault_secret_sync_errors_total{reason="TransformError"}`. The target Secret is not written on failure, so workloads keep the last known-good value.
 
 ## Running
 
@@ -125,16 +138,16 @@ helm template ferrvault-operator charts/ferrvault-operator \
 kubectl apply -f manager.yaml
 ```
 
-No duplicate `config/rbac/` or `config/crd/` lives in the repo — anything
+No duplicate `config/rbac/` or `config/crd/` lives in the repo; anything
 rendered from the chart *is* the canonical version.
 
 ## Prerequisites in FerrVault
 
 The operator relies on endpoints in [`FerrLabs/FerrVault-Cloud`](https://github.com/FerrLabs/FerrVault-Cloud) that shipped in `api@v4.0.0`:
 
-- API token auth (`Authorization: Bearer fft_...`) with granular scopes — #268
-- `secrets:read` scope enforcement on all secrets routes — #268
-- Bulk reveal endpoint — #277
+- API token auth (`Authorization: Bearer fft_...`) with granular scopes (#268)
+- `secrets:read` scope enforcement on all secrets routes (#268)
+- Bulk reveal endpoint (#277)
 
 ## Contributing
 
