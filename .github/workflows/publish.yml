@@ -53,7 +53,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
-          version: v4.2.3
+          version: v4.2.4
       - name: Log in to GHCR for helm push
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
