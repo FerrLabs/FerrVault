@@ -11,11 +11,13 @@ import (
 	"os"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -78,6 +80,36 @@ func main() {
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       leaderElectionID,
 		Cache:                  cacheOpts,
+		// Workloads are read straight from the API server, never through the
+		// cache.
+		//
+		// `rolloutRestart` reads a Deployment/StatefulSet/DaemonSet to annotate
+		// its pod template, which is why the operator asks for `get` and
+		// `patch` on them and nothing more. But a cached `Get` does not read:
+		// it starts an informer for the type, and an informer needs `list` and
+		// `watch`. Lacking them, the cache never syncs and the `Get` does not
+		// fail — it blocks forever. The reconcile never returns, and the single
+		// queue worker stalls behind it.
+		//
+		// That is not a hypothetical. On 2026-08-25 one added vault key changed
+		// a Secret's content, which invoked `rolloutRestart` for the first time
+		// in a long while, and the operator stopped reconciling every
+		// FerrVaultSecret on the cluster for hours — pod Ready, 4m of CPU, no
+		// condition turning false anywhere.
+		//
+		// Reading uncached makes the declared RBAC exactly sufficient again,
+		// and drops a cluster-wide cache of every workload the operator has no
+		// use for. The trade is one API call per rollout, on a path that only
+		// runs when a secret's content actually changed.
+		Client: client.Options{
+			Cache: &client.CacheOptions{
+				DisableFor: []client.Object{
+					&appsv1.Deployment{},
+					&appsv1.StatefulSet{},
+					&appsv1.DaemonSet{},
+				},
+			},
+		},
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
