@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [5.2.3] - 2026-08-26
+
+### Bug Fixes
+
+- fix(manager): read workloads uncached so declared rbac suffices (#240)
+
 ## [5.2.2] - 2026-08-10
 
 ### Bug Fixes
