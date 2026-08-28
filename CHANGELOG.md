@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [5.2.4] - 2026-08-28
+
+### Bug Fixes
+
+- fix(deps): update kubernetes monorepo to v0.37.0 (#238)
+
 ## [5.2.3] - 2026-08-26
 
 ### Bug Fixes
