@@ -6,86 +6,74 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	fvv1alpha1 "github.com/FerrLabs/FerrVault/api/ferrvault/v1alpha1"
+	"github.com/FerrLabs/FerrVault/internal/ferrvault"
 )
 
-// The bug these tests pin: a rate-limited retry, one second after a successful
-// sync of the same generation, rewrote Ready=False over it. Fourteen secrets
-// whose data was current in the cluster reported as broken, and a real failure
-// would have been indistinguishable among them.
-
-func syncedAt(gen int64, observed int64, when *metav1.Time) *fvv1alpha1.FerrVaultSecret {
-	cr := &fvv1alpha1.FerrVaultSecret{}
-	cr.Generation = gen
-	cr.Status.ObservedGeneration = observed
-	cr.Status.LastSyncedAt = when
-	return cr
-}
-
-func TestSyncedThisGeneration(t *testing.T) {
-	now := metav1.Now()
+// Le bug d'origine : un 429 arrivant une seconde après une synchronisation
+// réussie réécrivait Ready=False par-dessus. Quatorze secrets dont les données
+// étaient à jour dans le cluster se déclaraient en panne, et une vraie panne y
+// aurait été indiscernable.
+//
+// Le correctif tient à ce que le 429 sorte de `Reconcile` AVANT d'atteindre
+// `failReadyWithRequeue`. Ce test fige ce tri : il est le seul point où la
+// distinction se joue.
+func TestOnlyRateLimitingSkipsTheStatusWrite(t *testing.T) {
 	cases := []struct {
-		name string
-		cr   *fvv1alpha1.FerrVaultSecret
-		want bool
+		name          string
+		err           error
+		wantRateLimit bool
+		wantAuth      bool
+		wantNotFound  bool
 	}{
-		{"jamais synchronise", syncedAt(1, 0, nil), false},
-		{"synchronise sur cette generation", syncedAt(3, 3, &now), true},
-		{
-			// Le spec a changé depuis le dernier succès : un échec porte sur
-			// une configuration que personne n'a encore réussi à appliquer.
-			"spec modifie depuis le dernier succes",
-			syncedAt(4, 3, &now),
-			false,
-		},
-		{"generation a jour mais aucune synchro", syncedAt(2, 2, nil), false},
+		{"429 : report, statut inchange", &ferrvault.APIError{Status: 429, Message: "Too Many Requests"}, true, false, false},
+		{"401 : panne reelle", &ferrvault.AuthError{Kind: ferrvault.AuthUnauthorized, Message: "nope"}, false, true, false},
+		{"404 : panne reelle", &ferrvault.NotFoundError{Message: "vault absent"}, false, false, true},
+		{"500 : pas une limitation", &ferrvault.APIError{Status: 500, Message: "boom"}, false, false, false},
+		{"503 : pas une limitation", &ferrvault.APIError{Status: 503, Message: "indisponible"}, false, false, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := syncedThisGeneration(c.cr); got != c.want {
-				t.Fatalf("want %v, got %v", c.want, got)
+			if got := ferrvault.IsRateLimited(c.err); got != c.wantRateLimit {
+				t.Fatalf("IsRateLimited: want %v, got %v", c.wantRateLimit, got)
+			}
+			if got := ferrvault.IsAuthError(c.err); got != c.wantAuth {
+				t.Fatalf("IsAuthError: want %v, got %v", c.wantAuth, got)
+			}
+			if got := ferrvault.IsNotFound(c.err); got != c.wantNotFound {
+				t.Fatalf("IsNotFound: want %v, got %v", c.wantNotFound, got)
 			}
 		})
 	}
 }
 
-func TestIsTransient(t *testing.T) {
-	// Liste blanche courte, pas liste noire : une raison ajoutée plus tard est
-	// traitée comme une panne réelle jusqu'à décision contraire.
-	for _, r := range []string{"Unreachable", "RateLimited"} {
-		if !isTransient(r) {
-			t.Fatalf("%s devrait etre transitoire", r)
-		}
-	}
-	// Celles-ci sont de vraies pannes : un jeton révoqué, un vault supprimé.
-	// Les masquer derrière un succès antérieur laisserait l'opérateur vert
-	// alors qu'il ne peut plus rien lire — bien pire que le bug corrigé ici.
-	for _, r := range []string{
-		"AuthFailed", "VaultNotFound", "InvalidConnection",
-		"TransformError", "SecretWriteFailed", "MissingKeys", "TokenUnreadable",
-	} {
-		if isTransient(r) {
-			t.Fatalf("%s ne doit PAS etre traite comme transitoire", r)
-		}
-	}
-	if isTransient("UneRaisonAjouteePlusTard") {
-		t.Fatal("une raison inconnue doit etre traitee comme une panne reelle")
-	}
-}
-
-func TestTransientFailureDoesNotOverwriteASuccess(t *testing.T) {
-	now := metav1.NewTime(time.Now())
-	cr := syncedAt(2, 2, &now)
-
-	// Un 429 juste après un succès sur la même génération : les données sont
-	// à jour, la ressource ne doit pas se déclarer en échec.
-	if !isTransient("RateLimited") || !syncedThisGeneration(cr) {
-		t.Fatal("premisse du test")
+// `setCondition` conserve `LastTransitionTime` quand le statut ne change pas.
+// C'est ce qui permet de distinguer « en panne depuis dix minutes » de « en
+// panne depuis trois jours » en lisant la ressource — la seule façon, une fois
+// la liste blanche retirée, de juger de la gravité d'un `Unreachable`.
+func TestSetConditionPreservesTransitionTime(t *testing.T) {
+	old := metav1.NewTime(time.Now().Add(-72 * time.Hour))
+	conds := []metav1.Condition{{
+		Type:               "Ready",
+		Status:             metav1.ConditionFalse,
+		Reason:             "Unreachable",
+		LastTransitionTime: old,
+	}}
+	setCondition(&conds, metav1.Condition{
+		Type:    "Ready",
+		Status:  metav1.ConditionFalse,
+		Reason:  "Unreachable",
+		Message: "toujours injoignable",
+	})
+	if !conds[0].LastTransitionTime.Equal(&old) {
+		t.Fatal("un echec qui persiste ne doit pas rajeunir sa date de transition")
 	}
 
-	// Mais un échec d'authentification sur la même ressource, lui, doit
-	// ressortir : c'est une panne que le temps ne répare pas.
-	if isTransient("AuthFailed") {
-		t.Fatal("AuthFailed ne doit jamais etre masque par un succes anterieur")
+	setCondition(&conds, metav1.Condition{
+		Type:   "Ready",
+		Status: metav1.ConditionTrue,
+		Reason: "Synced",
+	})
+	if conds[0].LastTransitionTime.Equal(&old) {
+		t.Fatal("un passage a True doit redater la transition")
 	}
 }
