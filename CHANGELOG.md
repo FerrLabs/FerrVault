@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [5.2.5] - 2026-09-02
+
+### Bug Fixes
+
+- fix(controller): un 429 est un report, pas un echec de synchronisation (#249)
+
 ## [5.2.4] - 2026-08-28
 
 ### Bug Fixes
