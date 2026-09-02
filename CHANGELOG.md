@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [5.2.6] - 2026-09-02
+
+### Bug Fixes
+
+- fix(operator): stop reconciling in a hot loop by filtering self-inflicted status updates (#250)
+
 ## [5.2.5] - 2026-09-02
 
 ### Bug Fixes
