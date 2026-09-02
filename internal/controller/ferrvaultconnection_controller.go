@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	fvv1alpha1 "github.com/FerrLabs/FerrVault/api/ferrvault/v1alpha1"
@@ -179,7 +180,7 @@ func (r *FerrVaultConnectionReconciler) SetupWithManager(mgr ctrl.Manager) error
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&fvv1alpha1.FerrVaultConnection{}).
+		For(&fvv1alpha1.FerrVaultConnection{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
 		Watches(
 			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
