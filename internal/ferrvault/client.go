@@ -569,6 +569,18 @@ func IsNotFound(err error) bool {
 	return errors.As(err, &n)
 }
 
+// IsRateLimited reports whether the error represents a 429.
+//
+// A 429 is not a failure: the request was well-formed and authorised, the
+// server simply asked to be called back later. Treating it as an error is what
+// let a rate-limited retry overwrite the Ready condition of a sync that had
+// already succeeded one second earlier — the resource was up to date and
+// reported as broken.
+func IsRateLimited(err error) bool {
+	var a *APIError
+	return errors.As(err, &a) && a.Status == http.StatusTooManyRequests
+}
+
 // APIError covers any remaining non-2xx status. For 5xx responses it also
 // records the total number of attempts made before the client gave up.
 type APIError struct {

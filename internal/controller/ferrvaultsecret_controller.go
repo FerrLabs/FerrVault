@@ -26,6 +26,14 @@ const (
 	fvAnnotationContentHash       = "ferrvault.com/content-hash"
 	fvAnnotationRestartedAt       = "ferrvault.com/restarted-at"
 	fvSecretFinalizer             = "ferrvault.com/secret-cleanup"
+
+	// How long to wait after a 429 before trying again.
+	//
+	// The API's bucket refills at one token per second, so a short wait is
+	// enough for a handful of resources to get through. Long enough not to
+	// hammer a server that just asked for room, short enough that a resource
+	// blocked by someone else's burst is current again within the minute.
+	rateLimitRequeue = 20 * time.Second
 )
 
 type FerrVaultSecretReconciler struct {
@@ -116,6 +124,17 @@ func (r *FerrVaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		)
 	}
 	if err != nil {
+		// A 429 is a "call me back", not a failure. Requeue shortly and leave
+		// the status untouched: the resource may well be up to date from an
+		// earlier successful pass, and rewriting Ready=False here is what made
+		// fourteen healthy secrets report as broken while their data was
+		// current. Nothing is lost — the requeue re-reads within the minute.
+		if ferrvault.IsRateLimited(err) {
+			logger.Info("rate limited by the FerrVault API, retrying shortly",
+				"requeueAfter", rateLimitRequeue)
+			IncSyncError("RateLimited")
+			return ctrl.Result{RequeueAfter: rateLimitRequeue}, nil
+		}
 		if ferrvault.IsAuthError(err) {
 			return r.failReadyWithRequeue(ctx, &cr, "AuthFailed", err.Error(), 5*time.Minute)
 		}

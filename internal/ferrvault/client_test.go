@@ -317,3 +317,28 @@ func TestRevealFromVault_403ReturnsAuthError(t *testing.T) {
 		t.Errorf("expected AuthForbidden, got %T %v", err, err)
 	}
 }
+
+// IsRateLimited doit reconnaitre le 429 tel que le serveur le renvoie
+// reellement. Le message observe en production est
+// « ferrvault api error 429: Too Many Requests », produit par la branche
+// `default` du classement de statut.
+func TestIsRateLimited(t *testing.T) {
+	if !IsRateLimited(&APIError{Status: 429, Message: "Too Many Requests"}) {
+		t.Fatal("un 429 doit etre reconnu comme une limitation de debit")
+	}
+	// Un 429 est un report, pas une panne : il ne doit pas etre confondu avec
+	// les erreurs qui exigent une intervention humaine.
+	for _, e := range []error{
+		&APIError{Status: 500, Message: "boom"},
+		&APIError{Status: 400, Message: "bad request"},
+		&AuthError{Kind: AuthUnauthorized, Message: "nope"},
+		&NotFoundError{Message: "absent"},
+	} {
+		if IsRateLimited(e) {
+			t.Fatalf("%v ne doit pas etre pris pour une limitation de debit", e)
+		}
+	}
+	if IsRateLimited(nil) {
+		t.Fatal("nil n'est pas une limitation de debit")
+	}
+}
