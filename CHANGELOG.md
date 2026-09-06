@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [5.2.7] - 2026-09-06
+
+### Bug Fixes
+
+- fix(controller): un 429 sur la sonde ne marque plus la connexion en echec (#253)
+
 ## [5.2.6] - 2026-09-02
 
 ### Bug Fixes
