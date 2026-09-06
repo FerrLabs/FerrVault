@@ -65,7 +65,28 @@ func (r *FerrVaultConnectionReconciler) Reconcile(ctx context.Context, req ctrl.
 		return r.handleDelete(ctx, &conn)
 	}
 
-	status, reason, message := r.probe(ctx, &conn)
+	status, reason, message, probeErr := r.probe(ctx, &conn)
+
+	// Un 429 n'est pas une panne : la sonde était bien formée et autorisée, le
+	// serveur a seulement demandé qu'on le rappelle plus tard. Le traiter comme
+	// un échec a figé 25 connexions sur 33, entraînant avec elles tous les
+	// `FerrVaultSecret` qui en dépendent, alors que les instances FerrVault
+	// répondaient normalement.
+	//
+	// La cause de ce pic est corrigée côté serveur — la sonde de santé est
+	// sortie du limiteur — mais le raisonnement restait faux ici : toute autre
+	// saturation reproduirait le symptôme. C'est le pendant, pour les
+	// connexions, de ce que #249 a fait pour les secrets.
+	//
+	// La condition n'est PAS réécrite : une connexion prête le reste, une
+	// connexion en échec garde la cause de son échec. Seul l'horodatage du
+	// dernier contrôle serait trompeur, et il n'est pas touché non plus.
+	if ferrvault.IsRateLimited(probeErr) {
+		logger.Info("probe rate limited, condition left as-is",
+			"requeueAfter", rateLimitRequeue)
+		return ctrl.Result{RequeueAfter: rateLimitRequeue}, nil
+	}
+
 	logger.Info("probe finished", "ready", status, "reason", reason)
 
 	now := metav1.Now()
@@ -139,28 +160,31 @@ func (r *FerrVaultConnectionReconciler) handleDelete(
 	return ctrl.Result{RequeueAfter: connectionInUseRequeue}, nil
 }
 
+// probe rend l'erreur en plus de son message : l'appelant doit pouvoir la
+// TYPER, et une chaîne ne se distingue pas d'une autre. C'est ce qui permet de
+// traiter un 429 pour ce qu'il est, un report, plutôt que comme une panne.
 func (r *FerrVaultConnectionReconciler) probe(
 	ctx context.Context,
 	conn *fvv1alpha1.FerrVaultConnection,
-) (metav1.ConditionStatus, string, string) {
+) (metav1.ConditionStatus, string, string, error) {
 	broker := r.Broker
 	if broker == nil {
 		broker = NewTokenBroker(r.Client)
 	}
 	token, err := broker.TokenFor(ctx, conn)
 	if err != nil {
-		return metav1.ConditionFalse, "TokenUnreadable", err.Error()
+		return metav1.ConditionFalse, "TokenUnreadable", err.Error(), err
 	}
 	ffc, err := ferrvault.New(conn.Spec.URL, token)
 	if err != nil {
-		return metav1.ConditionFalse, "InvalidConnection", err.Error()
+		return metav1.ConditionFalse, "InvalidConnection", err.Error(), err
 	}
 	probeCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	if err := ffc.Probe(probeCtx); err != nil {
-		return metav1.ConditionFalse, "Unreachable", err.Error()
+		return metav1.ConditionFalse, "Unreachable", err.Error(), err
 	}
-	return metav1.ConditionTrue, "Reachable", fmt.Sprintf("%s responded to /healthz", conn.Spec.URL)
+	return metav1.ConditionTrue, "Reachable", fmt.Sprintf("%s responded to /healthz", conn.Spec.URL), nil
 }
 
 func (r *FerrVaultConnectionReconciler) SetupWithManager(mgr ctrl.Manager) error {
