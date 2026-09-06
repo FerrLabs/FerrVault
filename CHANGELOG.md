@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [5.2.8] - 2026-09-06
+
+### Bug Fixes
+
+- fix(deps): update module sigs.k8s.io/controller-runtime to v0.25.0 (#251)
+
 ## [5.2.7] - 2026-09-06
 
 ### Bug Fixes
