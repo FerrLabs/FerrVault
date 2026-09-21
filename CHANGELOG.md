@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [5.2.11] - 2026-09-21
+
+### Bug Fixes
+
+- fix(operator): restart workloads with a patch instead of an update (#270)
+
 ## [5.2.10] - 2026-09-17
 
 ### Bug Fixes
