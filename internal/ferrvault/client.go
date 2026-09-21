@@ -18,6 +18,8 @@ import (
 	"time"
 )
 
+const RequestTimeout = 10 * time.Second
+
 // RetryPolicy controls the bounded retry loop applied to every HTTP call the
 // client makes. Retries cover `TransportError` and HTTP 5xx responses only —
 // 4xx is returned immediately because those are caller-fixable (bad token,
@@ -87,7 +89,7 @@ func New(baseURL, token string, opts ...Option) (*Client, error) {
 		baseURL: u,
 		token:   token,
 		http: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: RequestTimeout,
 		},
 		retry: DefaultRetryPolicy(),
 	}
