@@ -38,7 +38,7 @@ func TestRolloutRestartOnlyNeedsPatch(t *testing.T) {
 		},
 	}
 
-	if err := r.triggerRollouts(context.Background(), cr); err != nil {
+	if err := r.triggerRollouts(context.Background(), cr, "content-hash"); err != nil {
 		t.Fatalf("rollout restart failed without the update verb: %v", err)
 	}
 
@@ -61,7 +61,7 @@ func TestRolloutRestartReportsAMissingWorkload(t *testing.T) {
 		},
 	}
 
-	if err := r.triggerRollouts(context.Background(), cr); err == nil {
+	if err := r.triggerRollouts(context.Background(), cr, "content-hash"); err == nil {
 		t.Fatal("a rollout of a workload that does not exist reported success")
 	}
 }
