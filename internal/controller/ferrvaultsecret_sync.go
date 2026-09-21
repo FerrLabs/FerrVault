@@ -72,6 +72,7 @@ func (r *FerrVaultSecretReconciler) ensureTargetSecret(
 func (r *FerrVaultSecretReconciler) triggerRollouts(
 	ctx context.Context,
 	cr *fvv1alpha1.FerrVaultSecret,
+	contentHash string,
 ) error {
 	logger := log.FromContext(ctx).WithValues("ferrvaultsecret", cr.Name)
 	now := time.Now().UTC().Format(time.RFC3339Nano)
@@ -81,10 +82,14 @@ func (r *FerrVaultSecretReconciler) triggerRollouts(
 		if !ok {
 			return fmt.Errorf("cannot copy %T", obj)
 		}
+		if tmpl.Annotations[fvAnnotationContentHash] == contentHash {
+			return nil
+		}
 		if tmpl.Annotations == nil {
 			tmpl.Annotations = map[string]string{}
 		}
 		tmpl.Annotations[fvAnnotationRestartedAt] = now
+		tmpl.Annotations[fvAnnotationContentHash] = contentHash
 		return r.Patch(ctx, obj, client.MergeFrom(base))
 	}
 
@@ -158,7 +163,7 @@ func (r *FerrVaultSecretReconciler) rolloutIfDue(
 		if cr.Status.LastRolloutHash == "" {
 			cr.Status.LastRolloutHash = previous
 		}
-		if err := r.triggerRollouts(ctx, cr); err != nil {
+		if err := r.triggerRollouts(ctx, cr, current); err != nil {
 			return err
 		}
 	}

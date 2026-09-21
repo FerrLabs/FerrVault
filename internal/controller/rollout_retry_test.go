@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
@@ -123,4 +124,64 @@ func (f reconcileFixture) restartedAt(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return d.Spec.Template.Annotations[fvAnnotationRestartedAt]
+}
+
+func TestARetryOnlyRestartsTheWorkloadsThatMissedTheRollout(t *testing.T) {
+	upstream := map[string]string{"API_KEY": "rotated"}
+	patches := map[string]int{}
+	f := newReconcileFixture(t, upstream, interceptor.Funcs{
+		Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+			if _, ok := obj.(*appsv1.Deployment); ok {
+				patches[obj.GetName()]++
+			}
+			return c.Patch(ctx, obj, patch, opts...)
+		},
+	})
+	ctx := context.Background()
+	cr := f.load(t)
+	cr.Spec.RolloutRestart = append(cr.Spec.RolloutRestart, fvv1alpha1.WorkloadRef{Kind: "Deployment", Name: "worker"})
+	if err := f.client.Update(ctx, &cr); err != nil {
+		t.Fatal(err)
+	}
+
+	for pass := 1; pass <= 2; pass++ {
+		if _, err := f.r.Reconcile(ctx, f.req); err == nil {
+			t.Fatalf("pass %d: a rollout with a missing workload reported success", pass)
+		}
+	}
+	if patches["api"] != 1 {
+		t.Fatalf("the healthy workload was restarted %d times while the other one was missing, want 1", patches["api"])
+	}
+
+	worker := &appsv1.Deployment{}
+	worker.Namespace, worker.Name = "default", "worker"
+	if err := f.client.Create(ctx, worker); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.r.Reconcile(ctx, f.req); err != nil {
+		t.Fatalf("once the workload exists the rollout should complete: %v", err)
+	}
+	if patches["worker"] != 1 || patches["api"] != 1 {
+		t.Fatalf("patches = %v, want the late workload restarted once and the healthy one still once", patches)
+	}
+	if !meta.IsStatusConditionTrue(f.load(t).Status.Conditions, conditionRolloutRestarted) {
+		t.Fatal("RolloutRestarted should be True once every workload has been restarted")
+	}
+}
+
+func TestAFailedRolloutStillCountsAsASuccessfulSync(t *testing.T) {
+	t.Cleanup(func() { LastSyncTimestamp.Reset() })
+	f := newReconcileFixture(t, map[string]string{"API_KEY": "rotated"}, interceptor.Funcs{
+		Patch: func(context.Context, client.WithWatch, client.Object, client.Patch, ...client.PatchOption) error {
+			return errPatchRefused
+		},
+	})
+
+	if _, err := f.r.Reconcile(context.Background(), f.req); err == nil {
+		t.Fatal("the rollout failure was swallowed")
+	}
+	if n := testutil.CollectAndCount(LastSyncTimestamp); n != 1 {
+		t.Fatalf("the data was synced but the sync gauge was not stamped (%d series), "+
+			"so the resource would look stale while its Secret is current", n)
+	}
 }
