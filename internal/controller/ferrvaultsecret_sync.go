@@ -76,11 +76,15 @@ func (r *FerrVaultSecretReconciler) triggerRollouts(
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 
 	patchPodTemplate := func(obj client.Object, tmpl *corev1.PodTemplateSpec) error {
+		base, ok := obj.DeepCopyObject().(client.Object)
+		if !ok {
+			return fmt.Errorf("cannot copy %T", obj)
+		}
 		if tmpl.Annotations == nil {
 			tmpl.Annotations = map[string]string{}
 		}
 		tmpl.Annotations[fvAnnotationRestartedAt] = now
-		return r.Update(ctx, obj)
+		return r.Patch(ctx, obj, client.MergeFrom(base))
 	}
 
 	var firstErr error
