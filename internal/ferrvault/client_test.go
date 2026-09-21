@@ -342,3 +342,18 @@ func TestIsRateLimited(t *testing.T) {
 		t.Fatal("nil n'est pas une limitation de debit")
 	}
 }
+
+func TestLongestCallCoversEveryAttemptAndTheWorstBackoff(t *testing.T) {
+	got := DefaultRetryPolicy().LongestCall(10 * time.Second)
+	want := 30*time.Second + 125*time.Millisecond + 500*time.Millisecond
+	if got != want {
+		t.Fatalf("LongestCall = %s, want %s (three 10s attempts plus 100ms and 400ms backoff at +25%% jitter)", got, want)
+	}
+}
+
+func TestLongestCallClampsToTheLastBackoff(t *testing.T) {
+	p := RetryPolicy{MaxAttempts: 4, Backoff: []time.Duration{time.Second}}
+	if got := p.LongestCall(time.Second); got != 7*time.Second {
+		t.Fatalf("LongestCall = %s, want 7s (four 1s attempts plus three 1s retries)", got)
+	}
+}

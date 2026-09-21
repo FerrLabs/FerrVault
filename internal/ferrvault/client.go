@@ -51,6 +51,18 @@ func DefaultRetryPolicy() RetryPolicy {
 	}
 }
 
+func (p RetryPolicy) LongestCall(requestTimeout time.Duration) time.Duration {
+	total := time.Duration(p.MaxAttempts) * requestTimeout
+	if len(p.Backoff) == 0 {
+		return total
+	}
+	for retry := 0; retry < p.MaxAttempts-1; retry++ {
+		idx := min(retry, len(p.Backoff)-1)
+		total += time.Duration(float64(p.Backoff[idx]) * (1 + p.Jitter))
+	}
+	return total
+}
+
 // Client is a narrow FerrVault HTTP client.
 //
 // Zero value is not usable; construct via `New`.
