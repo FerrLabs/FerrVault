@@ -229,7 +229,7 @@ func (r *FerrVaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if len(reveal.Missing) > 0 {
 		IncSyncError("MissingKeys")
 	} else {
-		SetLastSyncTimestamp(cr.Namespace, cr.Name)
+		SetLastSyncTimestamp(cr.Namespace, cr.Name, r.refreshInterval(&cr))
 		result = "success"
 	}
 

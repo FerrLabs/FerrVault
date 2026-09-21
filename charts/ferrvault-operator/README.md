@@ -58,6 +58,9 @@ kubectl delete crd ferrvaultsecrets.ferrvault.com ferrvaultconnections.ferrvault
 | `metrics.enabled` | `true` | |
 | `metrics.port` | `8080` | |
 | `metrics.serviceMonitor.enabled` | `false` | Requires Prometheus Operator CRDs. |
+| `metrics.prometheusRule.enabled` | `false` | Installs the alerts listed in the operator README. Requires Prometheus Operator CRDs, and the ServiceMonitor or another scrape of the operator. |
+| `metrics.prometheusRule.labels` | `{}` | Extra labels, for a Prometheus that selects rules by label. |
+| `metrics.prometheusRule.stuckAfterSeconds` | `300` | How long one reconcile may run before `FerrVaultOperatorReconcileStuck` fires. Keep it above `reconcileTimeout`: a reconcile running past the timeout is one whose call ignores cancellation. |
 | `probe.port` | `8081` | Liveness/readiness. |
 | `serviceAccount.create` | `true` | |
 | `serviceAccount.name` | `""` | Defaults to the release's fullname. |

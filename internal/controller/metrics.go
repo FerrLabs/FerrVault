@@ -46,6 +46,14 @@ var (
 
 	// ConnectionReady is 1 when a FerrVaultConnection's Ready condition is
 	// True, 0 otherwise.
+	RefreshInterval = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "ferrvault_secret_refresh_interval_seconds",
+			Help: "Interval a FerrVaultSecret is re-synced at, so the age of its last sync can be judged against its own cadence.",
+		},
+		[]string{"namespace", "name"},
+	)
+
 	ConnectionReady = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "ferrvault_connection_ready",
@@ -60,6 +68,7 @@ func init() {
 		SyncDuration,
 		SyncErrors,
 		LastSyncTimestamp,
+		RefreshInterval,
 		ConnectionReady,
 	)
 }
@@ -77,14 +86,16 @@ func IncSyncError(reason string) {
 }
 
 // SetLastSyncTimestamp stamps the current time on the per-CR gauge.
-func SetLastSyncTimestamp(namespace, name string) {
+func SetLastSyncTimestamp(namespace, name string, refresh time.Duration) {
 	LastSyncTimestamp.WithLabelValues(namespace, name).SetToCurrentTime()
+	RefreshInterval.WithLabelValues(namespace, name).Set(refresh.Seconds())
 }
 
 // DeleteLastSyncTimestamp drops the series for a CR that no longer exists,
 // so the gauge doesn't leak labels forever.
 func DeleteLastSyncTimestamp(namespace, name string) {
 	LastSyncTimestamp.DeleteLabelValues(namespace, name)
+	RefreshInterval.DeleteLabelValues(namespace, name)
 }
 
 // SetConnectionReady sets the ready gauge to 1 or 0.

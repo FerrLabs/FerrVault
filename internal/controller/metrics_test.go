@@ -55,11 +55,17 @@ func TestIncSyncError(t *testing.T) {
 }
 
 func TestLastSyncTimestampSetAndDelete(t *testing.T) {
-	t.Cleanup(func() { LastSyncTimestamp.Reset() })
+	t.Cleanup(func() {
+		LastSyncTimestamp.Reset()
+		RefreshInterval.Reset()
+	})
 
-	SetLastSyncTimestamp("ns", "name")
+	SetLastSyncTimestamp("ns", "name", 90*time.Second)
 	if got := testutil.ToFloat64(LastSyncTimestamp.WithLabelValues("ns", "name")); got <= 0 {
 		t.Fatalf("timestamp = %v, want > 0", got)
+	}
+	if got := testutil.ToFloat64(RefreshInterval.WithLabelValues("ns", "name")); got != 90 {
+		t.Fatalf("refresh interval = %v, want 90", got)
 	}
 	if n := testutil.CollectAndCount(LastSyncTimestamp); n != 1 {
 		t.Fatalf("expected 1 series, got %d", n)
@@ -67,7 +73,10 @@ func TestLastSyncTimestampSetAndDelete(t *testing.T) {
 
 	DeleteLastSyncTimestamp("ns", "name")
 	if n := testutil.CollectAndCount(LastSyncTimestamp); n != 0 {
-		t.Fatalf("expected 0 series after delete, got %d", n)
+		t.Fatalf("expected 0 timestamp series after delete, got %d", n)
+	}
+	if n := testutil.CollectAndCount(RefreshInterval); n != 0 {
+		t.Fatalf("the refresh interval outlived the timestamp it is compared against: %d series", n)
 	}
 }
 
