@@ -220,7 +220,7 @@ func (r *FerrVaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	if rolloutErr != nil {
 		if len(reveal.Missing) == 0 {
-			SetLastSyncTimestamp(cr.Namespace, cr.Name)
+			SetLastSyncTimestamp(cr.Namespace, cr.Name, r.refreshInterval(&cr))
 		}
 		IncSyncError("RolloutFailed")
 		return ctrl.Result{}, fmt.Errorf("rollout restart: %w", rolloutErr)
