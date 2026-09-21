@@ -18,6 +18,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -45,6 +46,7 @@ func main() {
 		defaultRefreshInterval time.Duration
 		watchNamespace         string
 		stallThreshold         time.Duration
+		reconcileTimeout       time.Duration
 	)
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080",
@@ -63,6 +65,9 @@ func main() {
 	flag.DurationVar(&stallThreshold, "stall-threshold", 15*time.Minute,
 		"Fail the liveness probe when no reconcile has completed for this long "+
 			"while FerrVault resources exist. Must stay above the connection probe interval.")
+	flag.DurationVar(&reconcileTimeout, "reconcile-timeout", 2*time.Minute,
+		"Cancel a single reconcile after this long, so one call that never returns cannot "+
+			"hold the work queue. Must stay well above the FerrVault API client timeout.")
 
 	opts := zap.Options{Development: false}
 	opts.BindFlags(flag.CommandLine)
@@ -83,7 +88,10 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       leaderElectionID,
-		Cache:                  cacheOpts,
+		Controller: config.Controller{
+			ReconciliationTimeout: reconcileTimeout,
+		},
+		Cache: cacheOpts,
 		// Workloads are read straight from the API server, never through the
 		// cache.
 		//
@@ -162,6 +170,7 @@ func main() {
 		"watchNamespace", fmtNs(watchNamespace),
 		"defaultRefreshInterval", defaultRefreshInterval,
 		"stallThreshold", stallThreshold,
+		"reconcileTimeout", reconcileTimeout,
 	)
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
