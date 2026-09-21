@@ -68,7 +68,7 @@ func main() {
 			"while FerrVault resources exist. Must stay above the connection probe interval.")
 	flag.DurationVar(&reconcileTimeout, "reconcile-timeout", 2*time.Minute,
 		"Cancel a single reconcile after this long, so one call that never returns cannot "+
-			"hold the work queue. Must stay well above the FerrVault API client timeout.")
+			"hold the work queue. Refused below the longest one FerrVault API call can take with its retries.")
 
 	opts := zap.Options{Development: false}
 	opts.BindFlags(flag.CommandLine)
@@ -192,10 +192,11 @@ func fmtNs(ns string) string {
 }
 
 func validateReconcileTimeout(d time.Duration) error {
-	if d < ferrvault.RequestTimeout {
-		return fmt.Errorf("%s is below the %s FerrVault API client timeout; "+
-			"0 would disable the guardrail and anything shorter cuts legitimate reveals short",
-			d, ferrvault.RequestTimeout)
+	floor := ferrvault.DefaultRetryPolicy().LongestCall(ferrvault.RequestTimeout)
+	if d < floor {
+		return fmt.Errorf("%s is below %s, the longest one FerrVault API call can legitimately take "+
+			"with its retries; 0 would disable the guardrail and anything shorter cancels healthy reveals",
+			d, floor)
 	}
 	return nil
 }
