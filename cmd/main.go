@@ -25,6 +25,7 @@ import (
 
 	fvv1alpha1 "github.com/FerrLabs/FerrVault/api/ferrvault/v1alpha1"
 	"github.com/FerrLabs/FerrVault/internal/controller"
+	"github.com/FerrLabs/FerrVault/internal/ferrvault"
 )
 
 var (
@@ -74,6 +75,11 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	if err := validateReconcileTimeout(reconcileTimeout); err != nil {
+		setupLog.Error(err, "invalid --reconcile-timeout")
+		os.Exit(1)
+	}
 
 	cacheOpts := cache.Options{}
 	if watchNamespace != "" {
@@ -183,4 +189,13 @@ func fmtNs(ns string) string {
 		return "<cluster-wide>"
 	}
 	return fmt.Sprintf("%q", ns)
+}
+
+func validateReconcileTimeout(d time.Duration) error {
+	if d < ferrvault.RequestTimeout {
+		return fmt.Errorf("%s is below the %s FerrVault API client timeout; "+
+			"0 would disable the guardrail and anything shorter cuts legitimate reveals short",
+			d, ferrvault.RequestTimeout)
+	}
+	return nil
 }
