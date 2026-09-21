@@ -56,6 +56,7 @@ func newReconcileFixture(t *testing.T, upstream map[string]string, funcs interce
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:  "default",
 				Name:       "runtime",
+				UID:        "6f1c2a4e-0d3b-4c8f-9a51-2b7e8d4f0c11",
 				Finalizers: []string{fvSecretFinalizer},
 			},
 			Spec: fvv1alpha1.SecretSpec{
@@ -94,15 +95,21 @@ func newReconcileFixture(t *testing.T, upstream map[string]string, funcs interce
 	}
 }
 
-func blockWorkloadReadsUntilCancelled(reads *atomic.Int32) interceptor.Funcs {
+func blockWorkloadReadsUntilCancelled(reads *atomic.Int32, blocking *atomic.Bool) interceptor.Funcs {
 	return interceptor.Funcs{
 		Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-			if _, ok := obj.(*appsv1.Deployment); ok {
+			if _, ok := obj.(*appsv1.Deployment); ok && blocking.Load() {
 				reads.Add(1)
 				<-ctx.Done()
 				return ctx.Err()
 			}
 			return c.Get(ctx, key, obj, opts...)
+		},
+		SubResourceUpdate: func(ctx context.Context, c client.Client, subResource string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			return c.SubResource(subResource).Update(ctx, obj, opts...)
 		},
 	}
 }

@@ -76,20 +76,21 @@ func (r *FerrVaultSecretReconciler) triggerRollouts(
 ) error {
 	logger := log.FromContext(ctx).WithValues("ferrvaultsecret", cr.Name)
 	now := time.Now().UTC().Format(time.RFC3339Nano)
+	hashKey := fvAnnotationContentHash + "." + string(cr.UID)
 
 	patchPodTemplate := func(obj client.Object, tmpl *corev1.PodTemplateSpec) error {
 		base, ok := obj.DeepCopyObject().(client.Object)
 		if !ok {
 			return fmt.Errorf("cannot copy %T", obj)
 		}
-		if tmpl.Annotations[fvAnnotationContentHash] == contentHash {
+		if tmpl.Annotations[hashKey] == contentHash {
 			return nil
 		}
 		if tmpl.Annotations == nil {
 			tmpl.Annotations = map[string]string{}
 		}
 		tmpl.Annotations[fvAnnotationRestartedAt] = now
-		tmpl.Annotations[fvAnnotationContentHash] = contentHash
+		tmpl.Annotations[hashKey] = contentHash
 		return r.Patch(ctx, obj, client.MergeFrom(base))
 	}
 
@@ -162,6 +163,9 @@ func (r *FerrVaultSecretReconciler) rolloutIfDue(
 	if rolloutDue(cr.Status.LastRolloutHash, previous, current) {
 		if cr.Status.LastRolloutHash == "" {
 			cr.Status.LastRolloutHash = previous
+			if err := r.Status().Update(ctx, cr); err != nil {
+				return fmt.Errorf("record pending rollout: %w", err)
+			}
 		}
 		if err := r.triggerRollouts(ctx, cr, current); err != nil {
 			return err
