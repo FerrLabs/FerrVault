@@ -148,7 +148,7 @@ A stuck operator looks healthy from the outside: the pod stays `Running`, and ev
 - `kubectl get fvs` shows `LastSynced` as an age. A healthy resource is re-synced at least every `spec.refreshInterval` (the chart's `defaultRefreshInterval`, one hour, when unset), whether or not anything changed.
 - A single reconcile is cancelled after `--reconcile-timeout` (two minutes by default), so one call that never returns cannot hold the work queue.
 - The liveness probe fails when no reconcile has completed for `--stall-threshold` (fifteen minutes) while FerrVault resources exist, so Kubernetes restarts a loop that has stopped turning.
-- A workload restart that fails is retried until it goes through. Until then the resource carries `RolloutRestarted=False` with the error, visible in `kubectl describe fvs`.
+- A workload restart that fails is retried until it goes through. `status.lastRolloutHash` records the content the workloads were last restarted for, and lags the target Secret's hash while a restart is pending, which is what makes the next pass retry instead of treating the unchanged Secret as nothing to do. A retry only touches the workloads that missed the rollout. Until then the resource carries `RolloutRestarted=False` with the error, visible in `kubectl describe fvs`.
 
 With `metrics.prometheusRule.enabled`, the chart installs these alerts:
 
