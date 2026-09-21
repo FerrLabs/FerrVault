@@ -28,6 +28,7 @@ const (
 	fvSecretConnectionRefIndexKey = ".spec.connectionRef.name"
 	fvAnnotationContentHash       = "ferrvault.com/content-hash"
 	fvAnnotationRestartedAt       = "ferrvault.com/restarted-at"
+	conditionRolloutRestarted     = "RolloutRestarted"
 	fvSecretFinalizer             = "ferrvault.com/secret-cleanup"
 )
 
@@ -171,10 +172,9 @@ func (r *FerrVaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		"contentChanged", contentChanged,
 	)
 
-	if contentChanged && len(cr.Spec.RolloutRestart) > 0 {
-		if err := r.triggerRollouts(ctx, &cr); err != nil {
-			logger.Error(err, "rollout restart failed")
-		}
+	rolloutErr := r.rolloutIfDue(ctx, &cr, oldHash, newHash)
+	if rolloutErr != nil {
+		logger.Error(rolloutErr, "rollout restart failed, will retry")
 	}
 
 	syncedKeys := make([]string, 0, len(transformed))
@@ -204,9 +204,15 @@ func (r *FerrVaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		Reason:  readyReason,
 		Message: readyMessage,
 	})
+	setRolloutCondition(&cr, rolloutErr)
 
 	if err := r.Status().Update(ctx, &cr); err != nil {
 		return ctrl.Result{}, fmt.Errorf("update status: %w", err)
+	}
+
+	if rolloutErr != nil {
+		IncSyncError("RolloutFailed")
+		return ctrl.Result{}, fmt.Errorf("rollout restart: %w", rolloutErr)
 	}
 
 	if len(reveal.Missing) > 0 {
