@@ -33,6 +33,7 @@ defaultRefreshInterval: 1h
 # resources exist. Keep it above the 10m connection probe interval, which is
 # the shortest reconcile a healthy operator is guaranteed to perform.
 stallThreshold: 15m
+reconcileTimeout: 2m
 # Log level for the operator's zap logger (debug, info, warn, error).
 logLevel: info
 # Extra command-line flags appended to the manager binary.

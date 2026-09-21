@@ -38,6 +38,7 @@ spec:
             - --health-probe-bind-address=:{{ .Values.probe.port }}
             - --default-refresh-interval={{ .Values.defaultRefreshInterval }}
             - --stall-threshold={{ .Values.stallThreshold }}
+            - --reconcile-timeout={{ .Values.reconcileTimeout }}
             {{- if .Values.leaderElection.enabled }}
             - --leader-elect
             - --leader-elect-id={{ .Values.leaderElection.id }}
