@@ -7,6 +7,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -134,4 +135,52 @@ func (r *FerrVaultSecretReconciler) refreshInterval(cr *fvv1alpha1.FerrVaultSecr
 		return r.DefaultRefreshInterval
 	}
 	return d
+}
+
+func rolloutDue(lastRolledOut, previous, current string) bool {
+	baseline := lastRolledOut
+	if baseline == "" {
+		baseline = previous
+	}
+	return baseline != "" && baseline != current
+}
+
+func (r *FerrVaultSecretReconciler) rolloutIfDue(
+	ctx context.Context,
+	cr *fvv1alpha1.FerrVaultSecret,
+	previous, current string,
+) error {
+	if len(cr.Spec.RolloutRestart) == 0 {
+		cr.Status.LastRolloutHash = ""
+		return nil
+	}
+	if rolloutDue(cr.Status.LastRolloutHash, previous, current) {
+		if cr.Status.LastRolloutHash == "" {
+			cr.Status.LastRolloutHash = previous
+		}
+		if err := r.triggerRollouts(ctx, cr); err != nil {
+			return err
+		}
+	}
+	cr.Status.LastRolloutHash = current
+	return nil
+}
+
+func setRolloutCondition(cr *fvv1alpha1.FerrVaultSecret, rolloutErr error) {
+	if len(cr.Spec.RolloutRestart) == 0 {
+		meta.RemoveStatusCondition(&cr.Status.Conditions, conditionRolloutRestarted)
+		return
+	}
+	condition := metav1.Condition{
+		Type:    conditionRolloutRestarted,
+		Status:  metav1.ConditionTrue,
+		Reason:  "UpToDate",
+		Message: "workloads run the current content of the target Secret",
+	}
+	if rolloutErr != nil {
+		condition.Status = metav1.ConditionFalse
+		condition.Reason = "RolloutFailed"
+		condition.Message = rolloutErr.Error()
+	}
+	setCondition(&cr.Status.Conditions, condition)
 }
