@@ -159,11 +159,19 @@ func (r *FerrVaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	newHash := hashSecretData(transformed)
-	secret, oldHash, err := r.ensureTargetSecret(ctx, &cr, transformed, newHash)
+	previousHash, err := r.targetContentHash(ctx, &cr)
+	if err != nil {
+		return r.failReady(ctx, &cr, "SecretReadFailed", err.Error())
+	}
+	if err := r.recordPendingRollout(ctx, &cr, previousHash, newHash); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	secret, _, err := r.ensureTargetSecret(ctx, &cr, transformed, newHash)
 	if err != nil {
 		return r.failReady(ctx, &cr, "SecretWriteFailed", err.Error())
 	}
-	contentChanged := oldHash != "" && oldHash != newHash
+	contentChanged := previousHash != "" && previousHash != newHash
 	logger.Info("synced secret",
 		"target", secret.Name,
 		"keys", len(transformed),
@@ -172,7 +180,7 @@ func (r *FerrVaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		"contentChanged", contentChanged,
 	)
 
-	rolloutErr := r.rolloutIfDue(ctx, &cr, oldHash, newHash)
+	rolloutErr := r.rolloutIfDue(ctx, &cr, previousHash, newHash)
 	if rolloutErr != nil {
 		logger.Error(rolloutErr, "rollout restart failed, will retry")
 	}

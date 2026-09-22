@@ -7,6 +7,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -161,12 +162,6 @@ func (r *FerrVaultSecretReconciler) rolloutIfDue(
 		return nil
 	}
 	if rolloutDue(cr.Status.LastRolloutHash, previous, current) {
-		if cr.Status.LastRolloutHash == "" {
-			cr.Status.LastRolloutHash = previous
-			if err := r.Status().Update(ctx, cr); err != nil {
-				return fmt.Errorf("record pending rollout: %w", err)
-			}
-		}
 		if err := r.triggerRollouts(ctx, cr, current); err != nil {
 			return err
 		}
@@ -192,4 +187,41 @@ func setRolloutCondition(cr *fvv1alpha1.FerrVaultSecret, rolloutErr error) {
 		condition.Message = rolloutErr.Error()
 	}
 	setCondition(&cr.Status.Conditions, condition)
+}
+
+func (r *FerrVaultSecretReconciler) targetContentHash(
+	ctx context.Context,
+	cr *fvv1alpha1.FerrVaultSecret,
+) (string, error) {
+	name := cr.Spec.Target.Name
+	if name == "" {
+		name = cr.Name
+	}
+	var secret corev1.Secret
+	key := types.NamespacedName{Namespace: cr.Namespace, Name: name}
+	if err := r.Get(ctx, key, &secret); err != nil {
+		if apierrors.IsNotFound(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	return secret.Annotations[fvAnnotationContentHash], nil
+}
+
+func (r *FerrVaultSecretReconciler) recordPendingRollout(
+	ctx context.Context,
+	cr *fvv1alpha1.FerrVaultSecret,
+	previous, current string,
+) error {
+	if len(cr.Spec.RolloutRestart) == 0 || cr.Status.LastRolloutHash != "" {
+		return nil
+	}
+	if !rolloutDue("", previous, current) {
+		return nil
+	}
+	cr.Status.LastRolloutHash = previous
+	if err := r.Status().Update(ctx, cr); err != nil {
+		return fmt.Errorf("record pending rollout: %w", err)
+	}
+	return nil
 }

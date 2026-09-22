@@ -113,3 +113,13 @@ func blockWorkloadReadsUntilCancelled(reads *atomic.Int32, blocking *atomic.Bool
 		},
 	}
 }
+
+func (f reconcileFixture) targetHash(t *testing.T) string {
+	t.Helper()
+	var secret corev1.Secret
+	key := types.NamespacedName{Namespace: "default", Name: "runtime"}
+	if err := f.client.Get(context.Background(), key, &secret); err != nil {
+		t.Fatal(err)
+	}
+	return secret.Annotations[fvAnnotationContentHash]
+}
