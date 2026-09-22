@@ -4,6 +4,13 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [5.3.0] - 2026-09-22
+
+### Features
+
+- feat(operator): alert when reconciles stall, time out, go stale or fail to restart workloads (#273)
+- feat(operator): cut stuck reconciles short and retry the rollouts they interrupt (#271)
+
 ## [5.2.11] - 2026-09-21
 
 ### Bug Fixes
