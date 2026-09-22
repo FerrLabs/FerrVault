@@ -50,6 +50,10 @@ metrics:
     labels: {}
     interval: 30s
     scrapeTimeout: 10s
+  prometheusRule:
+    enabled: false
+    labels: {}
+    stuckAfterSeconds: 300
 probe:
   port: 8081
 

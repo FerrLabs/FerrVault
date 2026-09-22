@@ -1,0 +1,57 @@
+{{- if and .Values.metrics.enabled .Values.metrics.prometheusRule.enabled -}}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "ferrvault-operator.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ferrvault-operator.labels" . | nindent 4 }}
+    {{- with .Values.metrics.prometheusRule.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: ferrvault-operator
+      rules:
+        - alert: FerrVaultOperatorReconcileStuck
+          expr: |
+            max by (namespace, controller) (
+              workqueue_longest_running_processor_seconds{controller=~"ferrvaultsecret|ferrvaultconnection"}
+            ) > {{ .Values.metrics.prometheusRule.stuckAfterSeconds }}
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "{{`A FerrVault operator reconcile has not returned in {{ $value | humanizeDuration }}`}}"
+            description: "{{`The {{ $labels.controller }} work queue is held by a call that ignores its context, past --reconcile-timeout. Nothing else on this controller is being reconciled.`}}"
+        - alert: FerrVaultOperatorReconcileTimeouts
+          expr: |
+            sum by (namespace, controller) (
+              increase(controller_runtime_reconcile_timeouts_total{controller=~"ferrvaultsecret|ferrvaultconnection"}[15m])
+            ) > 0
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{`FerrVault operator reconciles are being cancelled by --reconcile-timeout`}}"
+            description: "{{`{{ $value | humanize }} {{ $labels.controller }} reconcile(s) hit the timeout in 15 minutes. Something they call is not returning, often a workload read the operator lacks RBAC for.`}}"
+        - alert: FerrVaultSecretStale
+          expr: |
+            (time() - ferrvault_secret_last_sync_timestamp_seconds)
+              > 2 * ferrvault_secret_refresh_interval_seconds + 300
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{`FerrVaultSecret {{ or $labels.exported_namespace $labels.namespace }}/{{ $labels.name }} has not synced for over twice its refresh interval`}}"
+            description: "{{`Its last successful sync was {{ $value | humanizeDuration }} ago. The target Secret may no longer match FerrVault.`}}"
+        - alert: FerrVaultRolloutRestartFailing
+          expr: |
+            sum by (namespace) (
+              increase(ferrvault_secret_sync_errors_total{reason="RolloutFailed"}[1h])
+            ) > 0
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{`A FerrVaultSecret changed but its workloads could not be restarted`}}"
+            description: "{{`Pods keep the previous values until the restart goes through. The operator retries; the resource's RolloutRestarted condition carries the error.`}}"
+{{- end }}

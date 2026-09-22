@@ -141,6 +141,28 @@ kubectl apply -f manager.yaml
 No duplicate `config/rbac/` or `config/crd/` lives in the repo; anything
 rendered from the chart *is* the canonical version.
 
+## Monitoring
+
+A stuck operator looks healthy from the outside: the pod stays `Running`, and every `FerrVaultSecret` keeps the last condition it wrote. So the signals that matter come from outside the reconcile loop.
+
+- `kubectl get fvs` shows `LastSynced` as an age. A healthy resource is re-synced at least every `spec.refreshInterval` (the chart's `defaultRefreshInterval`, one hour, when unset), whether or not anything changed.
+- A single reconcile is cancelled after `--reconcile-timeout` (two minutes by default), so one call that never returns cannot hold the work queue.
+- The liveness probe fails when no reconcile has completed for `--stall-threshold` (fifteen minutes) while FerrVault resources exist, so Kubernetes restarts a loop that has stopped turning.
+- A workload restart that fails is retried until it goes through. `status.lastRolloutHash` records the content the workloads were last restarted for, and lags the target Secret's hash while a restart is pending, which is what makes the next pass retry instead of treating the unchanged Secret as nothing to do. A retry only touches the workloads that missed the rollout. Until then the resource carries `RolloutRestarted=False` with the error, visible in `kubectl describe fvs`.
+
+With `metrics.prometheusRule.enabled`, the chart installs these alerts:
+
+| Alert | Fires when |
+|---|---|
+| `FerrVaultOperatorReconcileStuck` | One reconcile has been running for more than `stuckAfterSeconds`, which means a call ignored `--reconcile-timeout`. |
+| `FerrVaultOperatorReconcileTimeouts` | Reconciles hit the timeout in the last 15 minutes. |
+| `FerrVaultSecretStale` | A resource's last successful sync is older than twice its own refresh interval plus five minutes. |
+| `FerrVaultRolloutRestartFailing` | A content change could not restart its workloads in the last hour. The window is wider than the 15 minutes the other error rule uses, because the retry backs off to one attempt every 16 minutes and a narrower window would let the alert resolve between two failures. |
+
+The first two catch a stuck loop within minutes whatever the refresh interval. `FerrVaultSecretStale` is the slower, per-resource signal: with the default one-hour interval it waits two hours, because a resource that syncs hourly cannot be told apart from a stuck one any sooner. `ferrvault_secret_refresh_interval_seconds` exposes each resource's interval for that comparison.
+
+One gap to know about: a `FerrVaultSecret` that has never synced once has no last-sync series, so it cannot be stale and none of these alerts fire for it. `kubectl get fvs` still shows `Ready=False`, with the reason in `kubectl describe`. Tracked in #277.
+
 ## Prerequisites in FerrVault
 
 The operator relies on endpoints in [`FerrLabs/FerrVault-Cloud`](https://github.com/FerrLabs/FerrVault-Cloud) that shipped in `api@v4.0.0`:
