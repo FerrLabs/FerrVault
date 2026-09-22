@@ -157,9 +157,11 @@ With `metrics.prometheusRule.enabled`, the chart installs these alerts:
 | `FerrVaultOperatorReconcileStuck` | One reconcile has been running for more than `stuckAfterSeconds`, which means a call ignored `--reconcile-timeout`. |
 | `FerrVaultOperatorReconcileTimeouts` | Reconciles hit the timeout in the last 15 minutes. |
 | `FerrVaultSecretStale` | A resource's last successful sync is older than twice its own refresh interval plus five minutes. |
-| `FerrVaultRolloutRestartFailing` | A content change could not restart its workloads in the last 15 minutes. |
+| `FerrVaultRolloutRestartFailing` | A content change could not restart its workloads in the last hour. The window is wider than the 15 minutes the other error rule uses, because the retry backs off to one attempt every 16 minutes and a narrower window would let the alert resolve between two failures. |
 
 The first two catch a stuck loop within minutes whatever the refresh interval. `FerrVaultSecretStale` is the slower, per-resource signal: with the default one-hour interval it waits two hours, because a resource that syncs hourly cannot be told apart from a stuck one any sooner. `ferrvault_secret_refresh_interval_seconds` exposes each resource's interval for that comparison.
+
+One gap to know about: a `FerrVaultSecret` that has never synced once has no last-sync series, so it cannot be stale and none of these alerts fire for it. It still reports `Ready=False` with the reason in `kubectl get fvs`. Tracked in #277.
 
 ## Prerequisites in FerrVault
 

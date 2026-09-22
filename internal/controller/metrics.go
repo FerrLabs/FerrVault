@@ -44,8 +44,6 @@ var (
 		[]string{"namespace", "name"},
 	)
 
-	// ConnectionReady is 1 when a FerrVaultConnection's Ready condition is
-	// True, 0 otherwise.
 	RefreshInterval = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "ferrvault_secret_refresh_interval_seconds",
@@ -54,6 +52,8 @@ var (
 		[]string{"namespace", "name"},
 	)
 
+	// ConnectionReady is 1 when a FerrVaultConnection's Ready condition is
+	// True, 0 otherwise.
 	ConnectionReady = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "ferrvault_connection_ready",

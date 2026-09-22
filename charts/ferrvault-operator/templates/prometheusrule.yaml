@@ -42,12 +42,12 @@ spec:
           labels:
             severity: warning
           annotations:
-            summary: "{{`FerrVaultSecret {{ $labels.exported_namespace }}/{{ $labels.name }} has not synced for over twice its refresh interval`}}"
+            summary: "{{`FerrVaultSecret {{ or $labels.exported_namespace $labels.namespace }}/{{ $labels.name }} has not synced for over twice its refresh interval`}}"
             description: "{{`Its last successful sync was {{ $value | humanizeDuration }} ago. The target Secret may no longer match FerrVault.`}}"
         - alert: FerrVaultRolloutRestartFailing
           expr: |
             sum by (namespace) (
-              increase(ferrvault_secret_sync_errors_total{reason="RolloutFailed"}[15m])
+              increase(ferrvault_secret_sync_errors_total{reason="RolloutFailed"}[1h])
             ) > 0
           labels:
             severity: warning
