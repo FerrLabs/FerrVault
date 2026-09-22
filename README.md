@@ -161,7 +161,7 @@ With `metrics.prometheusRule.enabled`, the chart installs these alerts:
 
 The first two catch a stuck loop within minutes whatever the refresh interval. `FerrVaultSecretStale` is the slower, per-resource signal: with the default one-hour interval it waits two hours, because a resource that syncs hourly cannot be told apart from a stuck one any sooner. `ferrvault_secret_refresh_interval_seconds` exposes each resource's interval for that comparison.
 
-One gap to know about: a `FerrVaultSecret` that has never synced once has no last-sync series, so it cannot be stale and none of these alerts fire for it. It still reports `Ready=False` with the reason in `kubectl get fvs`. Tracked in #277.
+One gap to know about: a `FerrVaultSecret` that has never synced once has no last-sync series, so it cannot be stale and none of these alerts fire for it. `kubectl get fvs` still shows `Ready=False`, with the reason in `kubectl describe`. Tracked in #277.
 
 ## Prerequisites in FerrVault
 
