@@ -18,6 +18,8 @@ import (
 	"time"
 )
 
+const RequestTimeout = 10 * time.Second
+
 // RetryPolicy controls the bounded retry loop applied to every HTTP call the
 // client makes. Retries cover `TransportError` and HTTP 5xx responses only —
 // 4xx is returned immediately because those are caller-fixable (bad token,
@@ -47,6 +49,18 @@ func DefaultRetryPolicy() RetryPolicy {
 		Backoff:     []time.Duration{100 * time.Millisecond, 400 * time.Millisecond, 1600 * time.Millisecond},
 		Jitter:      0.25,
 	}
+}
+
+func (p RetryPolicy) LongestCall(requestTimeout time.Duration) time.Duration {
+	total := time.Duration(p.MaxAttempts) * requestTimeout
+	if len(p.Backoff) == 0 {
+		return total
+	}
+	for retry := 0; retry < p.MaxAttempts-1; retry++ {
+		idx := min(retry, len(p.Backoff)-1)
+		total += time.Duration(float64(p.Backoff[idx]) * (1 + p.Jitter))
+	}
+	return total
 }
 
 // Client is a narrow FerrVault HTTP client.
@@ -87,7 +101,7 @@ func New(baseURL, token string, opts ...Option) (*Client, error) {
 		baseURL: u,
 		token:   token,
 		http: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: RequestTimeout,
 		},
 		retry: DefaultRetryPolicy(),
 	}

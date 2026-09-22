@@ -52,6 +52,7 @@ kubectl delete crd ferrvaultsecrets.ferrvault.com ferrvaultconnections.ferrvault
 | `watchNamespace` | `""` (cluster-wide) | Single namespace scope when set. |
 | `defaultRefreshInterval` | `1h` | Fallback for `FerrVaultSecret.spec.refreshInterval`. |
 | `stallThreshold` | `15m` | Liveness fails when no reconcile completes for this long while FerrVault resources exist. Keep it above the 10m connection probe interval. |
+| `reconcileTimeout` | `2m` | A single reconcile is cancelled after this long, so one call that never returns cannot hold the work queue. The operator refuses to start below about 31s, the longest one FerrVault API call can take with its three 10s attempts and backoff. |
 | `logLevel` | `info` | `debug`, `info`, `warn`, `error`. |
 | `extraArgs` | `[]` | Extra manager CLI flags. |
 | `metrics.enabled` | `true` | |

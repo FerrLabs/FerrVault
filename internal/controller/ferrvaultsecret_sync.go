@@ -7,6 +7,8 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -71,19 +73,25 @@ func (r *FerrVaultSecretReconciler) ensureTargetSecret(
 func (r *FerrVaultSecretReconciler) triggerRollouts(
 	ctx context.Context,
 	cr *fvv1alpha1.FerrVaultSecret,
+	contentHash string,
 ) error {
 	logger := log.FromContext(ctx).WithValues("ferrvaultsecret", cr.Name)
 	now := time.Now().UTC().Format(time.RFC3339Nano)
+	hashKey := fvAnnotationContentHash + "." + string(cr.UID)
 
 	patchPodTemplate := func(obj client.Object, tmpl *corev1.PodTemplateSpec) error {
 		base, ok := obj.DeepCopyObject().(client.Object)
 		if !ok {
 			return fmt.Errorf("cannot copy %T", obj)
 		}
+		if tmpl.Annotations[hashKey] == contentHash {
+			return nil
+		}
 		if tmpl.Annotations == nil {
 			tmpl.Annotations = map[string]string{}
 		}
 		tmpl.Annotations[fvAnnotationRestartedAt] = now
+		tmpl.Annotations[hashKey] = contentHash
 		return r.Patch(ctx, obj, client.MergeFrom(base))
 	}
 
@@ -134,4 +142,86 @@ func (r *FerrVaultSecretReconciler) refreshInterval(cr *fvv1alpha1.FerrVaultSecr
 		return r.DefaultRefreshInterval
 	}
 	return d
+}
+
+func rolloutDue(lastRolledOut, previous, current string) bool {
+	baseline := lastRolledOut
+	if baseline == "" {
+		baseline = previous
+	}
+	return baseline != "" && baseline != current
+}
+
+func (r *FerrVaultSecretReconciler) rolloutIfDue(
+	ctx context.Context,
+	cr *fvv1alpha1.FerrVaultSecret,
+	previous, current string,
+) error {
+	if len(cr.Spec.RolloutRestart) == 0 {
+		cr.Status.LastRolloutHash = ""
+		return nil
+	}
+	if rolloutDue(cr.Status.LastRolloutHash, previous, current) {
+		if err := r.triggerRollouts(ctx, cr, current); err != nil {
+			return err
+		}
+	}
+	cr.Status.LastRolloutHash = current
+	return nil
+}
+
+func setRolloutCondition(cr *fvv1alpha1.FerrVaultSecret, rolloutErr error) {
+	if len(cr.Spec.RolloutRestart) == 0 {
+		meta.RemoveStatusCondition(&cr.Status.Conditions, conditionRolloutRestarted)
+		return
+	}
+	condition := metav1.Condition{
+		Type:    conditionRolloutRestarted,
+		Status:  metav1.ConditionTrue,
+		Reason:  "UpToDate",
+		Message: "workloads run the current content of the target Secret",
+	}
+	if rolloutErr != nil {
+		condition.Status = metav1.ConditionFalse
+		condition.Reason = "RolloutFailed"
+		condition.Message = rolloutErr.Error()
+	}
+	setCondition(&cr.Status.Conditions, condition)
+}
+
+func (r *FerrVaultSecretReconciler) targetContentHash(
+	ctx context.Context,
+	cr *fvv1alpha1.FerrVaultSecret,
+) (string, error) {
+	name := cr.Spec.Target.Name
+	if name == "" {
+		name = cr.Name
+	}
+	var secret corev1.Secret
+	key := types.NamespacedName{Namespace: cr.Namespace, Name: name}
+	if err := r.Get(ctx, key, &secret); err != nil {
+		if apierrors.IsNotFound(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	return secret.Annotations[fvAnnotationContentHash], nil
+}
+
+func (r *FerrVaultSecretReconciler) recordPendingRollout(
+	ctx context.Context,
+	cr *fvv1alpha1.FerrVaultSecret,
+	previous, current string,
+) error {
+	if len(cr.Spec.RolloutRestart) == 0 || cr.Status.LastRolloutHash != "" {
+		return nil
+	}
+	if !rolloutDue("", previous, current) {
+		return nil
+	}
+	cr.Status.LastRolloutHash = previous
+	if err := r.Status().Update(ctx, cr); err != nil {
+		return fmt.Errorf("record pending rollout: %w", err)
+	}
+	return nil
 }

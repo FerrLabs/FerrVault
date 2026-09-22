@@ -18,12 +18,14 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	fvv1alpha1 "github.com/FerrLabs/FerrVault/api/ferrvault/v1alpha1"
 	"github.com/FerrLabs/FerrVault/internal/controller"
+	"github.com/FerrLabs/FerrVault/internal/ferrvault"
 )
 
 var (
@@ -45,6 +47,7 @@ func main() {
 		defaultRefreshInterval time.Duration
 		watchNamespace         string
 		stallThreshold         time.Duration
+		reconcileTimeout       time.Duration
 	)
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080",
@@ -63,12 +66,20 @@ func main() {
 	flag.DurationVar(&stallThreshold, "stall-threshold", 15*time.Minute,
 		"Fail the liveness probe when no reconcile has completed for this long "+
 			"while FerrVault resources exist. Must stay above the connection probe interval.")
+	flag.DurationVar(&reconcileTimeout, "reconcile-timeout", 2*time.Minute,
+		"Cancel a single reconcile after this long, so one call that never returns cannot "+
+			"hold the work queue. Refused below the longest one FerrVault API call can take with its retries.")
 
 	opts := zap.Options{Development: false}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	if err := validateReconcileTimeout(reconcileTimeout); err != nil {
+		setupLog.Error(err, "invalid --reconcile-timeout")
+		os.Exit(1)
+	}
 
 	cacheOpts := cache.Options{}
 	if watchNamespace != "" {
@@ -83,7 +94,10 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       leaderElectionID,
-		Cache:                  cacheOpts,
+		Controller: config.Controller{
+			ReconciliationTimeout: reconcileTimeout,
+		},
+		Cache: cacheOpts,
 		// Workloads are read straight from the API server, never through the
 		// cache.
 		//
@@ -162,6 +176,7 @@ func main() {
 		"watchNamespace", fmtNs(watchNamespace),
 		"defaultRefreshInterval", defaultRefreshInterval,
 		"stallThreshold", stallThreshold,
+		"reconcileTimeout", reconcileTimeout,
 	)
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
@@ -174,4 +189,14 @@ func fmtNs(ns string) string {
 		return "<cluster-wide>"
 	}
 	return fmt.Sprintf("%q", ns)
+}
+
+func validateReconcileTimeout(d time.Duration) error {
+	floor := ferrvault.DefaultRetryPolicy().LongestCall(ferrvault.RequestTimeout)
+	if d < floor {
+		return fmt.Errorf("%s is below %s, the longest one FerrVault API call can legitimately take "+
+			"with its retries; 0 would disable the guardrail and anything shorter cancels healthy reveals",
+			d, floor)
+	}
+	return nil
 }

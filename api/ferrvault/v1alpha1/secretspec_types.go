@@ -167,6 +167,8 @@ type SecretStatus struct {
 	// +optional
 	LastSyncedAt *metav1.Time `json:"lastSyncedAt,omitempty"`
 
+	LastRolloutHash string `json:"lastRolloutHash,omitempty"`
+
 	// SyncedKeys is the list of keys present in the target Secret after the
 	// most recent reconciliation. Handy for `kubectl get` columns and for
 	// diffing which keys disappeared upstream.

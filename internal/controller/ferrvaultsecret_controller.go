@@ -28,6 +28,7 @@ const (
 	fvSecretConnectionRefIndexKey = ".spec.connectionRef.name"
 	fvAnnotationContentHash       = "ferrvault.com/content-hash"
 	fvAnnotationRestartedAt       = "ferrvault.com/restarted-at"
+	conditionRolloutRestarted     = "RolloutRestarted"
 	fvSecretFinalizer             = "ferrvault.com/secret-cleanup"
 )
 
@@ -158,11 +159,19 @@ func (r *FerrVaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	newHash := hashSecretData(transformed)
-	secret, oldHash, err := r.ensureTargetSecret(ctx, &cr, transformed, newHash)
+	previousHash, err := r.targetContentHash(ctx, &cr)
+	if err != nil {
+		return r.failReady(ctx, &cr, "SecretReadFailed", err.Error())
+	}
+	if err := r.recordPendingRollout(ctx, &cr, previousHash, newHash); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	secret, _, err := r.ensureTargetSecret(ctx, &cr, transformed, newHash)
 	if err != nil {
 		return r.failReady(ctx, &cr, "SecretWriteFailed", err.Error())
 	}
-	contentChanged := oldHash != "" && oldHash != newHash
+	contentChanged := previousHash != "" && previousHash != newHash
 	logger.Info("synced secret",
 		"target", secret.Name,
 		"keys", len(transformed),
@@ -171,10 +180,9 @@ func (r *FerrVaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		"contentChanged", contentChanged,
 	)
 
-	if contentChanged && len(cr.Spec.RolloutRestart) > 0 {
-		if err := r.triggerRollouts(ctx, &cr); err != nil {
-			logger.Error(err, "rollout restart failed")
-		}
+	rolloutErr := r.rolloutIfDue(ctx, &cr, previousHash, newHash)
+	if rolloutErr != nil {
+		logger.Error(rolloutErr, "rollout restart failed, will retry")
 	}
 
 	syncedKeys := make([]string, 0, len(transformed))
@@ -204,9 +212,18 @@ func (r *FerrVaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		Reason:  readyReason,
 		Message: readyMessage,
 	})
+	setRolloutCondition(&cr, rolloutErr)
 
 	if err := r.Status().Update(ctx, &cr); err != nil {
 		return ctrl.Result{}, fmt.Errorf("update status: %w", err)
+	}
+
+	if rolloutErr != nil {
+		if len(reveal.Missing) == 0 {
+			SetLastSyncTimestamp(cr.Namespace, cr.Name)
+		}
+		IncSyncError("RolloutFailed")
+		return ctrl.Result{}, fmt.Errorf("rollout restart: %w", rolloutErr)
 	}
 
 	if len(reveal.Missing) > 0 {
