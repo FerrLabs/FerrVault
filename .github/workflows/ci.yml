@@ -13,7 +13,7 @@ jobs:
       contents: read
       pull-requests: write
     name: CI
-    uses: FerrLabs/.github/.github/workflows/reusable-ci-go.yml@39502a0fbaa351acb517c0113136c199f5e16e14 # main
+    uses: FerrLabs/.github/.github/workflows/reusable-ci-go.yml@dc37316d0b31cb7a47455f2933202533f9c909bd # main
     with:
       build-paths: ./cmd/...
       enable-sonar: true
