@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [5.3.1] - 2026-10-03
+
+### Bug Fixes
+
+- fix(cli): release the CLI on its own cli-v tags and let the action find them (#284)
+
 ## [5.3.0] - 2026-09-22
 
 ### Features
