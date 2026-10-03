@@ -80,8 +80,6 @@ func (r *FerrVaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			if err := r.Update(ctx, &cr); err != nil {
 				return ctrl.Result{}, fmt.Errorf("add finalizer: %w", err)
 			}
-			result = "success"
-			return ctrl.Result{}, nil
 		}
 	} else {
 		logger.Info("running pre-delete cleanup")
