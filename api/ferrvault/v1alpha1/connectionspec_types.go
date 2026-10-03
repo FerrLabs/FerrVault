@@ -12,6 +12,8 @@ import (
 // Exactly one authentication source must be set: either `tokenSecretRef`
 // (long-lived token stored in a k8s Secret) or `oidc` (workload-identity
 // exchange — recommended, no long-lived secret at rest).
+//
+// +kubebuilder:validation:XValidation:rule="self.mode != 'cloud' || (has(self.organization) && size(self.organization) > 0)",message="organization is required when mode is cloud"
 type ConnectionSpec struct {
 	// Mode selects which backend API the operator talks to:
 	//
@@ -38,11 +40,10 @@ type ConnectionSpec struct {
 
 	// Organization is the FerrVault org slug this connection targets. Every
 	// secret referencing this connection resolves `project` and `vault`
-	// inside this org.
+	// inside this org. Required in `cloud` mode, ignored in `ferrvault` mode.
 	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinLength=1
-	Organization string `json:"organization"`
+	// +optional
+	Organization string `json:"organization,omitempty"`
 
 	// TokenSecretRef points at a Kubernetes Secret holding a FerrVault
 	// authentication token — `ffclust_...` (cluster identity) or `fft_...`

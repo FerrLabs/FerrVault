@@ -80,8 +80,6 @@ func (r *FerrVaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			if err := r.Update(ctx, &cr); err != nil {
 				return ctrl.Result{}, fmt.Errorf("add finalizer: %w", err)
 			}
-			result = "success"
-			return ctrl.Result{}, nil
 		}
 	} else {
 		logger.Info("running pre-delete cleanup")
@@ -114,6 +112,11 @@ func (r *FerrVaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	ffc, err := factory(conn.Spec.URL, token)
 	if err != nil {
 		return r.failReady(ctx, &cr, "InvalidConnection", err.Error())
+	}
+
+	if conn.ResolvedMode() == fvv1alpha1.ModeCloud && (conn.Spec.Organization == "" || cr.Spec.Project == "") {
+		return r.failReady(ctx, &cr, "MissingCloudScope",
+			"mode cloud needs organization on the FerrVaultConnection and project on the FerrVaultSecret")
 	}
 
 	var reveal *ferrvault.BulkRevealResponse
