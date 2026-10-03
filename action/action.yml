@@ -81,11 +81,18 @@ runs:
         if [[ "$VERSION" == "latest" ]]; then
           # /releases/latest returns the single most-recent release across
           # all tag prefixes — in this repo the operator (v*) and the CLI
-          # (cli-v*) cohabit, so we list the cli-v* tags and take the highest.
-          VERSION="$(curl -fsSL 'https://api.github.com/repos/FerrLabs/FerrVault/git/matching-refs/tags/cli-v' \
+          # (cli-v*) cohabit, so we list the cli-v* tags and take the highest
+          # one whose binary for this runner is already uploaded.
+          VERSION=""
+          for tag in $(curl -fsSL 'https://api.github.com/repos/FerrLabs/FerrVault/git/matching-refs/tags/cli-v' \
             | jq -r '.[].ref | sub("^refs/tags/"; "") | select(test("^cli-v[0-9]+[.][0-9]+[.][0-9]+$"))' \
-            | sort -V | tail -n 1)"
-          if [[ -z "$VERSION" || "$VERSION" == "null" ]]; then
+            | sort -rV); do
+            if curl -fsIL -o /dev/null "https://github.com/FerrLabs/FerrVault/releases/download/${tag}/ferrvault-${os}-${arch}.tar.gz"; then
+              VERSION="$tag"
+              break
+            fi
+          done
+          if [[ -z "$VERSION" ]]; then
             echo "::error::no cli-v* release found on FerrLabs/FerrVault — pin cli-version explicitly" >&2
             exit 1
           fi
