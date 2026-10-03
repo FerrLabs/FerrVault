@@ -1,7 +1,6 @@
 {
   "$schema": "https://ferrflow.com/schema/ferrflow.json",
   "workspace": {
-    "latestTag": "latest",
     "releaseCommitBody": "full",
     "recoverMissedReleases": true,
     "skipCi": false,
@@ -11,19 +10,33 @@
     {
       "name": "ferrvault-operator",
       "path": ".",
+      "tagTemplate": "v{version}",
+      "latestTag": "latest",
       "changelog": "CHANGELOG.md",
       "versionedFiles": [
-        { "path": "go.mod", "format": "gomod" }
+        {
+          "path": "go.mod",
+          "format": "gomod"
+        }
       ],
       "publishers": [
         {
           "kind": "docker",
           "image": "ghcr.io/ferrlabs/ferrvault-operator",
-          "tags": ["{version}", "v{major}", "latest"],
-          "platforms": ["linux/amd64", "linux/arm64"],
+          "tags": [
+            "{version}",
+            "v{major}",
+            "latest"
+          ],
+          "platforms": [
+            "linux/amd64",
+            "linux/arm64"
+          ],
           "args": [
-            "--label", "org.opencontainers.image.source=https://github.com/FerrLabs/FerrVault",
-            "--label", "org.opencontainers.image.licenses=MPL-2.0"
+            "--label",
+            "org.opencontainers.image.source=https://github.com/FerrLabs/FerrVault",
+            "--label",
+            "org.opencontainers.image.licenses=MPL-2.0"
           ]
         },
         {
@@ -32,6 +45,19 @@
           "registry": "oci://ghcr.io/ferrlabs/charts"
         }
       ]
+    },
+    {
+      "name": "ferrvault-cli",
+      "path": "cli",
+      "tagTemplate": "cli-v{version}",
+      "changelog": "cli/CHANGELOG.md",
+      "versionedFiles": [
+        {
+          "path": "cli/Cargo.toml",
+          "format": "toml"
+        }
+      ],
+      "updateLockfiles": true
     }
   ]
 }
