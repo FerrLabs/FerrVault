@@ -85,14 +85,14 @@ func TestCloudModeWithoutOrganizationFailsBeforeCallingTheAPI(t *testing.T) {
 
 func TestCloudModeWithFullScopeReveals(t *testing.T) {
 	reason, calls := reconcileWithScope(t, fvv1alpha1.ModeCloud, "acme", "billing")
-	if reason == "MissingCloudScope" || calls != 1 {
-		t.Fatalf("reason=%q bulk calls=%d, want one reveal", reason, calls)
+	if reason != "Synced" || calls != 1 {
+		t.Fatalf("reason=%q bulk calls=%d, want Synced after one reveal", reason, calls)
 	}
 }
 
 func TestFerrVaultModeSyncsWithoutProjectOrOrganization(t *testing.T) {
 	reason, calls := reconcileWithScope(t, fvv1alpha1.ModeFerrVault, "", "")
-	if reason == "MissingCloudScope" || calls != 0 {
-		t.Fatalf("reason=%q bulk calls=%d, want a ferrvault-mode sync", reason, calls)
+	if reason != "Synced" || calls != 0 {
+		t.Fatalf("reason=%q bulk calls=%d, want Synced with no cloud reveal", reason, calls)
 	}
 }
