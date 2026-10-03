@@ -88,7 +88,7 @@ metadata:
   namespace: default
 type: Opaque
 stringData:
-  token: fft_replace_me
+  token: fvsat_replace_me
 ---
 apiVersion: ferrvault.com/v1alpha1
 kind: FerrVaultConnection
@@ -97,7 +97,6 @@ metadata:
   namespace: default
 spec:
   url: https://ferrvault.example.com
-  organization: acme
   tokenSecretRef:
     name: ferrvault-api-token
     key: token
@@ -109,7 +108,6 @@ metadata:
   namespace: default
 spec:
   connectionRef: { name: prod }
-  project: web
   vault: production
   selector:
     names: [DATABASE_URL, STRIPE_KEY]

@@ -105,11 +105,12 @@ type SecretSpec struct {
 	// +kubebuilder:validation:Required
 	ConnectionRef LocalObjectReference `json:"connectionRef"`
 
-	// Project is the FerrVault project slug.
+	// Project is the FerrVault project slug. Required in `cloud` mode,
+	// ignored in `ferrvault` mode.
 	//
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength=1
-	Project string `json:"project"`
+	// +optional
+	Project string `json:"project,omitempty"`
 
 	// Vault is the FerrVault vault name inside the project (often used as the
 	// environment identifier: `production`, `staging`, …).

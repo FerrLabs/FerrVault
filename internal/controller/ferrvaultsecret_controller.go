@@ -116,6 +116,11 @@ func (r *FerrVaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return r.failReady(ctx, &cr, "InvalidConnection", err.Error())
 	}
 
+	if conn.ResolvedMode() == fvv1alpha1.ModeCloud && (conn.Spec.Organization == "" || cr.Spec.Project == "") {
+		return r.failReady(ctx, &cr, "MissingCloudScope",
+			"mode cloud needs organization on the FerrVaultConnection and project on the FerrVaultSecret")
+	}
+
 	var reveal *ferrvault.BulkRevealResponse
 	switch conn.ResolvedMode() {
 	case fvv1alpha1.ModeFerrVault:

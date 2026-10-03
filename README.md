@@ -29,7 +29,7 @@ Two CRDs under `ferrvault.com/v1alpha1`:
 
 ### `FerrVaultConnection` (shortname `fvc`)
 
-Declares how to reach a FerrVault instance. One per (namespace, org). Shared by every `FerrVaultSecret` in that namespace that targets the same organization.
+Declares how to reach a FerrVault instance. Shared by every `FerrVaultSecret` in that namespace that references it.
 
 ```yaml
 apiVersion: ferrvault.com/v1alpha1
@@ -38,13 +38,14 @@ metadata:
   name: prod
 spec:
   url: https://ferrvault.example.com
-  organization: acme
   tokenSecretRef:
     name: ferrvault-api-token
     key: token
 ```
 
-The referenced Secret must hold a FerrVault API token (`fft_...`) with at least the `secrets:read` scope.
+The referenced Secret must hold a FerrVault service-account token (`fvsat_...`), minted from the vault's Tokens tab. The token is bound to one environment of one vault, so the connection needs no organization.
+
+`mode: cloud` targets the legacy FerrLabs-Cloud API instead. It then requires `organization` on the connection and `project` on every `FerrVaultSecret`; both fields are ignored in the default `ferrvault` mode.
 
 ### `FerrVaultSecret` (shortname `fvs`)
 
@@ -57,7 +58,6 @@ metadata:
   name: web-env
 spec:
   connectionRef: { name: prod }
-  project: web
   vault: production          # FerrVault vault name (often the environment)
   selector:
     names: [DATABASE_URL, STRIPE_KEY]   # omit to sync every key in the vault
@@ -67,7 +67,7 @@ spec:
   refreshInterval: 30m       # Go time.Duration; 0s disables scheduled refresh
 ```
 
-On reconciliation the operator calls `GET /api/v1/orgs/:org/projects/:project/vaults/by-name/:vault/secrets/reveal` once, writes the returned `{name: value}` map into `spec.target.name`, and sets the CR's `Ready` condition based on whether any requested keys were missing upstream.
+On reconciliation the operator calls `POST /operator/secrets/reveal` once (`GET /api/v1/orgs/:org/projects/:project/vaults/by-name/:vault/secrets/reveal` in `cloud` mode), writes the returned `{name: value}` map into `spec.target.name`, and sets the CR's `Ready` condition based on whether any requested keys were missing upstream.
 
 The generated Secret is owned by the CR, so deleting the CR garbage-collects the Secret.
 
@@ -78,7 +78,6 @@ Revealed values can be reshaped before they land in the target Secret via `spec.
 ```yaml
 spec:
   connectionRef: { name: prod }
-  project: web
   vault: production
   selector:
     names: [DATABASE_URL, STRIPE_KEY, CONFIG_JSON]

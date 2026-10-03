@@ -50,7 +50,7 @@ spec:
               type: object
               required: [url]
               x-kubernetes-validations:
-                - rule: "self.mode != 'cloud' || (has(self.organization) && self.organization != '')"
+                - rule: "self.mode != 'cloud' || (has(self.organization) && size(self.organization) > 0)"
                   message: "organization is required when mode is cloud"
               properties:
                 mode:
