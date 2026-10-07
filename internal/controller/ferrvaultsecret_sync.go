@@ -31,11 +31,9 @@ func (r *FerrVaultSecretReconciler) ensureTargetSecret(
 	cr *fvv1alpha1.FerrVaultSecret,
 	data map[string]string,
 	newHash string,
+	owned bool,
 ) (*corev1.Secret, string, error) {
-	name := cr.Spec.Target.Name
-	if name == "" {
-		name = cr.Name
-	}
+	name := targetName(cr)
 	secretType := corev1.SecretType(cr.Spec.Target.Type)
 	if secretType == "" {
 		secretType = corev1.SecretTypeOpaque
@@ -52,8 +50,12 @@ func (r *FerrVaultSecretReconciler) ensureTargetSecret(
 		if existing, ok := secret.Annotations[fvAnnotationContentHash]; ok {
 			oldHash = existing
 		}
-		if err := controllerutil.SetControllerReference(cr, secret, r.Scheme); err != nil {
-			return err
+		if owned {
+			if err := controllerutil.SetControllerReference(cr, secret, r.Scheme); err != nil {
+				return err
+			}
+		} else {
+			secret.OwnerReferences = withoutOwner(secret.OwnerReferences, cr.UID)
 		}
 		secret.Type = secretType
 		if secret.Annotations == nil {
