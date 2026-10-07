@@ -161,6 +161,30 @@ func (r *FerrVaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return r.failReady(ctx, &cr, "TransformError", err.Error())
 	}
 
+	tokenKey, tokenTarget := connectionTokenKey(&conn, &cr)
+	if tokenTarget {
+		if _, ok := transformed[tokenKey]; !ok {
+			return r.failReadyWithRequeue(ctx, &cr, "TokenKeyMissing", fmt.Sprintf(
+				"target %s holds the token of connection %s and the synced data has no %q key: left unchanged",
+				targetName(&cr), conn.Name, tokenKey), missingKeysRequeue(r.refreshInterval(&cr)))
+		}
+	}
+
+	if len(reveal.Missing) > 0 {
+		exists, err := r.targetExists(ctx, &cr)
+		if err != nil {
+			return r.failReady(ctx, &cr, "SecretReadFailed", err.Error())
+		}
+		if exists || len(transformed) == 0 {
+			sort.Strings(reveal.Missing)
+			cr.Status.MissingKeys = reveal.Missing
+			cr.Status.ObservedGeneration = cr.Generation
+			return r.failReadyWithRequeue(ctx, &cr, "MissingKeys", fmt.Sprintf(
+				"missing in FerrVault: %v: %s left unchanged", reveal.Missing, targetName(&cr)),
+				missingKeysRequeue(r.refreshInterval(&cr)))
+		}
+	}
+
 	newHash := hashSecretData(transformed)
 	previousHash, err := r.targetContentHash(ctx, &cr)
 	if err != nil {
@@ -170,7 +194,7 @@ func (r *FerrVaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
-	secret, _, err := r.ensureTargetSecret(ctx, &cr, transformed, newHash)
+	secret, _, err := r.ensureTargetSecret(ctx, &cr, transformed, newHash, !tokenTarget)
 	if err != nil {
 		return r.failReady(ctx, &cr, "SecretWriteFailed", err.Error())
 	}
@@ -231,10 +255,10 @@ func (r *FerrVaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	if len(reveal.Missing) > 0 {
 		IncSyncError("MissingKeys")
-	} else {
-		SetLastSyncTimestamp(cr.Namespace, cr.Name, r.refreshInterval(&cr))
-		result = "success"
+		return ctrl.Result{RequeueAfter: missingKeysRequeue(r.refreshInterval(&cr))}, nil
 	}
+	SetLastSyncTimestamp(cr.Namespace, cr.Name, r.refreshInterval(&cr))
+	result = "success"
 
 	return ctrl.Result{RequeueAfter: r.refreshInterval(&cr)}, nil
 }
