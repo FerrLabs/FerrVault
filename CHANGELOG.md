@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [5.3.3] - 2026-10-07
+
+### Bug Fixes
+
+- fix(operator): keep an existing target and the connection token intact when keys are missing (#287)
+
 ## [5.3.2] - 2026-10-03
 
 ### Bug Fixes
