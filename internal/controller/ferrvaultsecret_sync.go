@@ -195,12 +195,8 @@ func (r *FerrVaultSecretReconciler) targetContentHash(
 	ctx context.Context,
 	cr *fvv1alpha1.FerrVaultSecret,
 ) (string, error) {
-	name := cr.Spec.Target.Name
-	if name == "" {
-		name = cr.Name
-	}
 	var secret corev1.Secret
-	key := types.NamespacedName{Namespace: cr.Namespace, Name: name}
+	key := types.NamespacedName{Namespace: cr.Namespace, Name: targetName(cr)}
 	if err := r.Get(ctx, key, &secret); err != nil {
 		if apierrors.IsNotFound(err) {
 			return "", nil

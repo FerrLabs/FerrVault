@@ -18,7 +18,7 @@ import (
 	"github.com/FerrLabs/FerrVault/internal/ferrvault"
 )
 
-const guardSecretUID = "0b7e9c52-3f1d-4a6e-8c2b-5d9f1e7a3c40"
+const guardOwnerUID = "0b7e9c52-3f1d-4a6e-8c2b-5d9f1e7a3c40"
 
 type partialVault struct {
 	secrets map[string]string
@@ -57,7 +57,7 @@ func newGuardFixture(t *testing.T, target string, transforms []fvv1alpha1.Secret
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:  "default",
 				Name:       "sync",
-				UID:        guardSecretUID,
+				UID:        guardOwnerUID,
 				Finalizers: []string{fvSecretFinalizer},
 			},
 			Spec: fvv1alpha1.SecretSpec{
@@ -183,7 +183,7 @@ func TestConnectionTokenTargetIsRotatedWithoutOwnership(t *testing.T) {
 		t.Fatalf("token not rotated: %v %v", s.Data, s.StringData)
 	}
 	for _, ref := range s.OwnerReferences {
-		if ref.UID == guardSecretUID {
+		if ref.UID == guardOwnerUID {
 			t.Fatal("the connection token Secret is owned by the FerrVaultSecret, deleting it would garbage-collect the token")
 		}
 	}
@@ -193,7 +193,7 @@ func TestConnectionTokenTargetDropsAPreviousOwnerReference(t *testing.T) {
 	controller := true
 	owned := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "fv-token-owned", OwnerReferences: []metav1.OwnerReference{{
-			APIVersion: fvv1alpha1.GroupVersion.String(), Kind: "FerrVaultSecret", Name: "sync", UID: guardSecretUID, Controller: &controller,
+			APIVersion: fvv1alpha1.GroupVersion.String(), Kind: "FerrVaultSecret", Name: "sync", UID: guardOwnerUID, Controller: &controller,
 		}}},
 		Data: map[string][]byte{"token": []byte("fvsat_old")},
 	}
@@ -236,7 +236,7 @@ func TestOrdinaryTargetIsStillOwned(t *testing.T) {
 	f.reconcile(t)
 
 	s, _ := f.secret(t, "runtime")
-	if len(s.OwnerReferences) != 1 || s.OwnerReferences[0].UID != guardSecretUID {
+	if len(s.OwnerReferences) != 1 || s.OwnerReferences[0].UID != guardOwnerUID {
 		t.Fatalf("ordinary target lost its controller reference: %+v", s.OwnerReferences)
 	}
 }
