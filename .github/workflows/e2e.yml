@@ -49,7 +49,7 @@ jobs:
         with:
           cluster_name: ferrvault-e2e
           # Keep the node image pinned so a kind release doesn't break us.
-          node_image: kindest/node:v1.32.2
+          node_image: kindest/node:v1.37.0
 
       - name: Install Helm
         if: steps.gate.outputs.has_go == 'true'

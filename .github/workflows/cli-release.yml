@@ -64,7 +64,7 @@ jobs:
               build-essential pkg-config libdbus-1-dev
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
         with:
-          toolchain: '1.98'
+          toolchain: '1.99'
           targets: ${{ matrix.target }}
       - uses: taiki-e/upload-rust-binary-action@f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6 # v1
         with:
