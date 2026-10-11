@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [5.3.6] - 2026-10-11
+
+### Bug Fixes
+
+- fix(operator): probe a new connection on the reconcile that adds its finalizer (#295)
+
 ## [5.3.5] - 2026-10-11
 
 ### Bug Fixes
