@@ -71,7 +71,6 @@ func (r *FerrVaultConnectionReconciler) Reconcile(ctx context.Context, req ctrl.
 			if err := r.Update(ctx, &conn); err != nil {
 				return ctrl.Result{}, fmt.Errorf("add finalizer: %w", err)
 			}
-			return ctrl.Result{}, nil
 		}
 	} else {
 		return r.handleDelete(ctx, &conn)
