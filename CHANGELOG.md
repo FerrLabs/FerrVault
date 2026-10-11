@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [5.3.4] - 2026-10-11
+
+### Bug Fixes
+
+- fix(deps): update module github.com/prometheus/client_golang to v1.25.0 (#290)
+
 ## [5.3.3] - 2026-10-07
 
 ### Bug Fixes
