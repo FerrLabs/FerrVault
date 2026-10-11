@@ -4,7 +4,8 @@
     "releaseCommitBody": "full",
     "recoverMissedReleases": true,
     "skipCi": false,
-    "deferPublish": true
+    "deferPublish": true,
+    "nestedPackages": "exclusive"
   },
   "package": [
     {
