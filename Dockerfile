@@ -1,5 +1,5 @@
 # Build the manager binary.
-FROM docker.io/library/golang:1.26-bookworm AS builder
+FROM docker.io/library/golang:1.27-bookworm AS builder
 
 WORKDIR /workspace
 
