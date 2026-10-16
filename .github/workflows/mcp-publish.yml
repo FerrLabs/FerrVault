@@ -1,0 +1,102 @@
+name: MCP publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish, e.g. mcp-v10.14.0
+        required: true
+        type: string
+
+concurrency:
+  group: mcp-publish-${{ inputs.tag || github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish-npm:
+    name: Publish npm
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'mcp-v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: mcp
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.tag || github.event.release.tag_name }}
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          version: "12"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7 # zizmor: ignore[cache-poisoning]
+        with:
+          node-version: "24"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Publish
+        run: |
+          packdir="$RUNNER_TEMP/pack"
+          for dir in packages/*; do
+            name=$(node -p "require('./$dir/package.json').name")
+            version=$(node -p "require('./$dir/package.json').version")
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "$name@$version already on npm, skipping"
+              continue
+            fi
+            rm -rf "$packdir" && mkdir -p "$packdir"
+            (cd "$dir" && pnpm pack --pack-destination "$packdir")
+            npx --yes npm@11 publish "$packdir"/*.tgz --access public --provenance
+          done
+
+  publish-ghcr:
+    name: Publish GHCR image (${{ matrix.image }})
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'mcp-v')
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: "@ferrvault/mcp"
+            image: ferrvault-mcp
+          - package: "@ferrvault/api-mcp"
+            image: ferrvault-api-mcp
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.tag || github.event.release.tag_name }}
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Compute version
+        id: ver
+        env:
+          TAG: ${{ inputs.tag || github.event.release.tag_name }}
+        run: |
+          v="${TAG#mcp-v}"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: mcp
+          file: ./mcp/Dockerfile
+          push: true
+          build-args: |
+            PACKAGE=${{ matrix.package }}
+          tags: |
+            ghcr.io/ferrlabs/${{ matrix.image }}:${{ steps.ver.outputs.version }}
+            ghcr.io/ferrlabs/${{ matrix.image }}:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/FerrLabs/FerrVault
+            org.opencontainers.image.version=${{ steps.ver.outputs.version }}
+            org.opencontainers.image.licenses=MPL-2.0

@@ -1,0 +1,41 @@
+{
+  "name": "@ferrvault/mcp",
+  "version": "10.13.0",
+  "description": "Model Context Protocol server for FerrVault: vaults, secrets, secret requests, rotation",
+  "license": "MPL-2.0",
+  "type": "module",
+  "bin": {
+    "ferrvault-mcp": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "keywords": [
+    "mcp",
+    "ferrlabs",
+    "ferrvault",
+    "secrets",
+    "model-context-protocol"
+  ],
+  "dependencies": {
+    "@ferrlabs/mcp-core": "^10.13.0",
+    "zod": "^4.3.6"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FerrLabs/FerrVault.git",
+    "directory": "mcp/packages/ferrvault-mcp"
+  }
+}

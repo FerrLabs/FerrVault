@@ -59,6 +59,26 @@
         }
       ],
       "updateLockfiles": true
+    },
+    {
+      "name": "ferrvault-mcp",
+      "path": "mcp",
+      "tagTemplate": "mcp-v{version}",
+      "changelog": "mcp/CHANGELOG.md",
+      "versionedFiles": [
+        {
+          "path": "mcp/package.json",
+          "format": "json"
+        },
+        {
+          "path": "mcp/packages/ferrvault-mcp/package.json",
+          "format": "json"
+        },
+        {
+          "path": "mcp/packages/ferrvault-api-mcp/package.json",
+          "format": "json"
+        }
+      ]
     }
   ]
 }
