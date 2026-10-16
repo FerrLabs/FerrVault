@@ -63,13 +63,21 @@ func (r *FerrVaultSecretReconciler) ensureTargetSecret(
 		}
 		secret.Annotations["ferrvault.com/managed-by"] = "ferrvault-operator"
 		secret.Annotations[fvAnnotationContentHash] = newHash
-		secret.StringData = data
-		secret.Data = nil
+		secret.StringData = nil
+		secret.Data = secretBytes(data)
 		return nil
 	}); err != nil {
 		return nil, "", err
 	}
 	return secret, oldHash, nil
+}
+
+func secretBytes(data map[string]string) map[string][]byte {
+	out := make(map[string][]byte, len(data))
+	for k, v := range data {
+		out[k] = []byte(v)
+	}
+	return out
 }
 
 func (r *FerrVaultSecretReconciler) triggerRollouts(
