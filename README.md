@@ -170,10 +170,6 @@ The operator relies on endpoints in [`FerrLabs/FerrVault-Cloud`](https://github.
 - `secrets:read` scope enforcement on all secrets routes (#268)
 - Bulk reveal endpoint (#277)
 
-## MCP servers
-
-[`mcp/`](mcp) holds the Model Context Protocol servers for FerrVault: [`@ferrvault/mcp`](https://www.npmjs.com/package/@ferrvault/mcp) and [`@ferrvault/api-mcp`](https://www.npmjs.com/package/@ferrvault/api-mcp). They are released on their own `mcp-v*` tags.
-
 ## MCP server
 
 [`mcp/`](mcp) holds the Model Context Protocol server for FerrVault, [`@ferrvault/mcp`](https://www.npmjs.com/package/@ferrvault/mcp). It talks to the FerrVault API directly and is released on its own `mcp-v*` tags.
