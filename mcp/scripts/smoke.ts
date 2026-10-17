@@ -34,12 +34,6 @@ const SERVERS: ServerUnderTest[] = [
   {
     pkg: 'ferrvault-mcp',
     serverName: 'ferrvault',
-    expectedTools: ['get_vault', 'list_secrets', 'create_secret', 'rotate_secret', 'delete_vault'],
-    expectedResourceTemplates: ['ferrvault://org/{org}/project/{project}/vault/{id}'],
-  },
-  {
-    pkg: 'ferrvault-api-mcp',
-    serverName: 'ferrvault-api',
     expectedTools: [
       'list_ferrvault_vaults',
       'list_ferrvault_environments',

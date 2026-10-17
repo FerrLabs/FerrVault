@@ -191,15 +191,6 @@ importers:
         specifier: ^5.0.0
         version: 5.0.5(@types/node@25.9.9)(@vitest/coverage-v8@5.0.5)(vite@8.3.4(@types/node@25.9.9)(esbuild@0.28.2)(tsx@4.23.15))
 
-  packages/ferrvault-api-mcp:
-    dependencies:
-      '@ferrlabs/mcp-core':
-        specifier: ^10.13.0
-        version: 10.13.0(zod@4.6.7)
-      zod:
-        specifier: ^4.3.6
-        version: 4.6.7
-
   packages/ferrvault-mcp:
     dependencies:
       '@ferrlabs/mcp-core':

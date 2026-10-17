@@ -1,63 +1,50 @@
-import { z } from 'zod';
-import { apiRequest, getToken, type McpServer, toToolText } from '@ferrlabs/mcp-core';
+import { getToken, type McpServer } from '@ferrlabs/mcp-core';
+import { secretPath, secretsPath, vaultRequest } from '../api.js';
+import { guarded, textResult } from '../results.js';
+import { environmentSlug, secretName, vaultSlug } from '../schemas.js';
+import { type RevealedSecret, type SecretMetadata, withoutValue } from '../secret.js';
 
-interface SecretSummary {
-  id: string;
-  name: string;
-  description: string | null;
-  created_at: string;
-  updated_at: string;
-  rotated_at: string | null;
-}
-
-interface SecretRevealed extends SecretSummary {
-  value: string;
-}
-
-export function registerSecretTools(server: McpServer) {
+export function registerSecretReadTools(server: McpServer): void {
   server.tool(
-    'list_secrets',
-    'List secrets inside a FerrVault vault. Values are NOT included — use get_secret with reveal=true to see a specific value.',
-    {
-      org_slug: z.string().min(1).describe('Organization slug'),
-      project_slug: z.string().min(1).describe('Project slug'),
-      vault_id: z.string().min(1).describe('Vault id'),
-    },
-    async ({ org_slug, project_slug, vault_id }) => {
-      const token = await getToken();
-      const secrets = await apiRequest<SecretSummary[]>(
-        `/orgs/${encodeURIComponent(org_slug)}/projects/${encodeURIComponent(project_slug)}/vaults/${encodeURIComponent(vault_id)}/secrets`,
-        { token },
-      );
-      return {
-        content: [{ type: 'text' as const, text: toToolText(secrets) }],
-      };
-    },
+    'list_ferrvault_secrets',
+    'List the secrets of one vault environment: names, versions, tags and expiry. Never includes values.',
+    { vault: vaultSlug, environment: environmentSlug },
+    ({ vault, environment }) =>
+      guarded(async () => {
+        const token = await getToken();
+        const secrets = await vaultRequest<(SecretMetadata & { value?: unknown })[]>(
+          secretsPath({ vault, environment }),
+          { token },
+        );
+        return textResult(secrets.map(withoutValue));
+      }),
   );
 
   server.tool(
-    'get_secret',
-    'Get one secret. By default returns metadata only; pass reveal=true to also include the decrypted value (audit-logged on the server).',
-    {
-      org_slug: z.string().min(1).describe('Organization slug'),
-      project_slug: z.string().min(1).describe('Project slug'),
-      vault_id: z.string().min(1).describe('Vault id'),
-      secret_id: z.string().min(1).describe('Secret id'),
-      reveal: z
-        .boolean()
-        .optional()
-        .describe('Include the decrypted value in the response (default false).'),
-    },
-    async ({ org_slug, project_slug, vault_id, secret_id, reveal }) => {
-      const token = await getToken();
-      const qs = reveal ? '?reveal=true' : '';
-      const secret = await apiRequest<SecretRevealed>(
-        `/orgs/${encodeURIComponent(org_slug)}/projects/${encodeURIComponent(project_slug)}/vaults/${encodeURIComponent(vault_id)}/secrets/${encodeURIComponent(secret_id)}${qs}`,
-        { token },
-      );
-      return {
-        content: [{ type: 'text' as const, text: toToolText(secret) }],
-      };
-    },
+    'reveal_ferrvault_secret',
+    'Reveal the current plaintext value of one secret. The read is audit-logged by FerrVault and the value lands in this conversation transcript: only call it when the user explicitly asks to see the value. To create or rotate a value without exposing it, use generate_ferrvault_secret.',
+    { vault: vaultSlug, environment: environmentSlug, name: secretName },
+    ({ vault, environment, name }) =>
+      guarded(async () => {
+        const token = await getToken();
+        return textResult(
+          await vaultRequest<RevealedSecret>(secretPath({ vault, environment }, name), { token }),
+        );
+      }),
+  );
+
+  server.tool(
+    'delete_ferrvault_secret',
+    'Delete a secret from one vault environment. Workloads reading it lose access.',
+    { vault: vaultSlug, environment: environmentSlug, name: secretName },
+    ({ vault, environment, name }) =>
+      guarded(async () => {
+        const token = await getToken();
+        await vaultRequest<void>(secretPath({ vault, environment }, name), {
+          token,
+          method: 'DELETE',
+        });
+        return textResult({ deleted: name, vault, environment });
+      }),
   );
 }

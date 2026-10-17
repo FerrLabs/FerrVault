@@ -63,8 +63,6 @@ jobs:
         include:
           - package: "@ferrvault/mcp"
             image: ferrvault-mcp
-          - package: "@ferrvault/api-mcp"
-            image: ferrvault-api-mcp
     permissions:
       contents: read
       packages: write

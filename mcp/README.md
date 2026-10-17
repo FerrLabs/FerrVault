@@ -1,9 +1,8 @@
 # FerrVault MCP
 
-FerrVault as Model Context Protocol servers, so an AI assistant can drive it.
+FerrVault as a Model Context Protocol server, so an AI assistant can drive it.
 
 [![npm @ferrvault/mcp](https://img.shields.io/npm/v/@ferrvault/mcp)](https://www.npmjs.com/package/@ferrvault/mcp)
-[![npm @ferrvault/api-mcp](https://img.shields.io/npm/v/@ferrvault/api-mcp)](https://www.npmjs.com/package/@ferrvault/api-mcp)
 
 ## Quick start
 
@@ -12,8 +11,7 @@ Add to your MCP client configuration (Claude Code, Cursor, etc.):
 ```json
 {
   "mcpServers": {
-    "ferrvault": { "command": "npx", "args": ["-y", "@ferrvault/mcp"] },
-    "ferrvault-api": { "command": "npx", "args": ["-y", "@ferrvault/api-mcp"] }
+    "ferrvault": { "command": "npx", "args": ["-y", "@ferrvault/mcp"] }
   }
 }
 ```
@@ -25,15 +23,6 @@ The first tool call that needs auth opens a browser for an OAuth loopback flow a
 Tools marked **destructive** are irreversible or high-impact. MCP clients should gate them behind a confirmation.
 
 ### `@ferrvault/mcp`
-
-| Tool                                                               | Notes                                               |
-| ------------------------------------------------------------------ | --------------------------------------------------- |
-| `get_vault`, `list_secrets`, `get_secret`, `get_vault_audit_log`   | read                                                |
-| `list_secret_requests`, `archive_secret_request`                   | secret-request workflow                             |
-| `create_vault`, `update_vault`, `delete_vault`                     | `delete_vault` is **destructive**                   |
-| `create_secret`, `update_secret`, `rotate_secret`, `delete_secret` | `rotate_secret`/`delete_secret` are **destructive** |
-
-### `@ferrvault/api-mcp`
 
 Targets the FerrVault API (`api.ferrvault.com`, or a self-hosted instance through `FERRVAULT_API_URL`): vaults, their environments, and the secrets, secret requests and service tokens of each environment. Vaults belong to the organization the token is signed in to.
 
@@ -56,20 +45,12 @@ The FerrVault API accepts FerrLabs session JWTs, not `fft_*` API tokens. Over HT
 | `create_ferrvault_service_token`                       | name, role, optional expiry; the token is written into a target secret (created or versioned) and never returned, and revoked again if that write fails; vault admin                                       |
 | `revoke_ferrvault_service_token`                       | by id; **destructive**, workloads using it lose access; vault admin                                                                                                                                        |
 
-## Resources and prompts
-
-| Server           | Kind     | Name                                                 | What it holds                                     |
-| ---------------- | -------- | ---------------------------------------------------- | ------------------------------------------------- |
-| `@ferrvault/mcp` | Resource | `ferrvault://org/{org}/project/{project}/vault/{id}` | vault name, description, secret count, timestamps |
-
-A vault is addressed directly by URI: listing every vault would mean walking every org and every project on each request. **Vault resources carry metadata only.** Secret values stay behind `get_secret`, which needs `reveal=true` and is audit-logged server-side. No resource ever returns one.
-
 ## Configuration
 
-| Variable                | Description                                                                                                                                                                                    | Default                     |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| `FERRVAULT_API_URL`     | Base URL for the FerrVault API (`@ferrvault/api-mcp`). Its host must be allowed (see `FERRLABS_MCP_ALLOWED_API_HOSTS`). For an internal CA, point `NODE_EXTRA_CA_CERTS` at the CA certificate. | `https://api.ferrvault.com` |
-| `FERRVAULT_API_VERSION` | Contract version sent as `x-ferrvault-api-version` by `@ferrvault/api-mcp`.                                                                                                                    | `2026-08-04`                |
+| Variable                | Description                                                                                                                                                                                | Default                     |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------- |
+| `FERRVAULT_API_URL`     | Base URL for the FerrVault API (`@ferrvault/mcp`). Its host must be allowed (see `FERRLABS_MCP_ALLOWED_API_HOSTS`). For an internal CA, point `NODE_EXTRA_CA_CERTS` at the CA certificate. | `https://api.ferrvault.com` |
+| `FERRVAULT_API_VERSION` | Contract version sent as `x-ferrvault-api-version` by `@ferrvault/mcp`.                                                                                                                    | `2026-08-04`                |
 
 Shared variables (token, OAuth, host allowlist, HTTP transport, output cap) are read by [`@ferrlabs/mcp-core`](https://github.com/FerrLabs/MCP/tree/main/packages/mcp-core) and documented in the [FerrLabs MCP README](https://github.com/FerrLabs/MCP#configuration).
 
@@ -83,7 +64,7 @@ pnpm test
 pnpm smoke
 ```
 
-`pnpm smoke` boots each server over stdio and checks the handshake and the advertised tools.
+`pnpm smoke` boots the server over stdio and checks the handshake and the advertised tools.
 
 ## License
 

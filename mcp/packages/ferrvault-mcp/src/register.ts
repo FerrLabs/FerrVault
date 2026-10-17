@@ -1,16 +1,16 @@
 import type { McpServer } from '@ferrlabs/mcp-core';
-import { registerVaultDetailsTool } from './tools/vault-details.js';
-import { registerSecretTools } from './tools/secrets.js';
-import { registerVaultAuditTools } from './tools/audit.js';
-import { registerVaultMutationTools } from './tools/vaults.js';
-import { registerSecretMutationTools } from './tools/secret-mutations.js';
-import { registerVaultResources } from './resources/vaults.js';
+import { registerVaultTools } from './tools/vaults.js';
+import { registerSecretReadTools } from './tools/secrets.js';
+import { registerSecretWriteTools } from './tools/secret-writes.js';
+import { registerSecretRequestTools } from './tools/secret-requests.js';
+import { registerSecretCopyTools } from './tools/secret-copy.js';
+import { registerServiceTokenTools } from './tools/service-tokens.js';
 
 export function register(server: McpServer): void {
-  registerVaultDetailsTool(server);
-  registerSecretTools(server);
-  registerVaultAuditTools(server);
-  registerVaultMutationTools(server);
-  registerSecretMutationTools(server);
-  registerVaultResources(server);
+  registerVaultTools(server);
+  registerSecretReadTools(server);
+  registerSecretWriteTools(server);
+  registerSecretRequestTools(server);
+  registerSecretCopyTools(server);
+  registerServiceTokenTools(server);
 }
