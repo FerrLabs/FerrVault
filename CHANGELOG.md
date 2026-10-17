@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [6.0.0] - 2026-10-17
+
+### Breaking Changes
+
+- feat(mcp)!: serve @ferrvault/mcp from the FerrVault API (#305)
+
 ## [5.3.7] - 2026-10-16
 
 ### Bug Fixes
