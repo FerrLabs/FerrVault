@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [5.3.7] - 2026-10-16
+
+### Bug Fixes
+
+- fix(operator): write target Secret as Data so reconciles stop rewriting it (#303)
+
 ## [5.3.6] - 2026-10-11
 
 ### Bug Fixes
