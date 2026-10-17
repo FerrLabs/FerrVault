@@ -62,7 +62,7 @@ jobs:
       matrix:
         include:
           - package: "@ferrvault/mcp"
-            image: ferrvault-mcp
+            image: ferrvault-mcp-server
     permissions:
       contents: read
       packages: write
