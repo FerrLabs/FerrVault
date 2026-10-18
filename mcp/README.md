@@ -16,7 +16,7 @@ Add to your MCP client configuration (Claude Code, Cursor, etc.):
 }
 ```
 
-The first tool call that needs auth opens a browser for an OAuth loopback flow and saves the token. To skip it (CI, headless), set `FERRLABS_API_TOKEN`. Details in the [FerrLabs MCP README](https://github.com/FerrLabs/MCP#how-auth-resolution-works).
+The first tool call that needs auth opens a browser for an OAuth loopback flow and saves the token. To skip it (CI, headless), set `FERRLABS_API_TOKEN`. Details in the [FerrLabs MCP README](https://github.com/FerrLabs/FerrLabs/blob/main/packages/mcp/README.md#how-auth-resolution-works).
 
 ## Tools
 
@@ -52,7 +52,7 @@ The FerrVault API accepts FerrLabs session JWTs, not `fft_*` API tokens. Over HT
 | `FERRVAULT_API_URL`     | Base URL for the FerrVault API (`@ferrvault/mcp`). Its host must be allowed (see `FERRLABS_MCP_ALLOWED_API_HOSTS`). For an internal CA, point `NODE_EXTRA_CA_CERTS` at the CA certificate. | `https://api.ferrvault.com` |
 | `FERRVAULT_API_VERSION` | Contract version sent as `x-ferrvault-api-version` by `@ferrvault/mcp`.                                                                                                                    | `2026-08-04`                |
 
-Shared variables (token, OAuth, host allowlist, HTTP transport, output cap) are read by [`@ferrlabs/mcp-core`](https://github.com/FerrLabs/MCP/tree/main/packages/mcp-core) and documented in the [FerrLabs MCP README](https://github.com/FerrLabs/MCP#configuration).
+Shared variables (token, OAuth, host allowlist, HTTP transport, output cap) are read by [`@ferrlabs/mcp-core`](https://github.com/FerrLabs/FerrLabs/tree/main/packages/mcp-core) and documented in the [FerrLabs MCP README](https://github.com/FerrLabs/FerrLabs/blob/main/packages/mcp/README.md#configuration).
 
 ## Development
 
