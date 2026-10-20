@@ -22,7 +22,7 @@
     "model-context-protocol"
   ],
   "dependencies": {
-    "@ferrlabs/mcp-core": "^10.13.0",
+    "@ferrlabs/mcp-core": "^10.14.0",
     "zod": "^4.3.6"
   },
   "scripts": {

@@ -194,8 +194,8 @@ importers:
   packages/ferrvault-mcp:
     dependencies:
       '@ferrlabs/mcp-core':
-        specifier: ^10.13.0
-        version: 10.13.0(zod@4.6.7)
+        specifier: ^10.14.0
+        version: 10.14.0(zod@4.6.7)
       zod:
         specifier: ^4.3.6
         version: 4.6.7
@@ -379,8 +379,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@ferrlabs/mcp-core@10.13.0':
-    resolution: {integrity: sha512-Xmu0wUYwWfyJKfzxwh/6/N4j6tRXsA06HwhiYQAH1acdfawTPwIRbub8N12T9ZNmFHawl40WzbnBODtq2+LXPQ==}
+  '@ferrlabs/mcp-core@10.14.0':
+    resolution: {integrity: sha512-tJrERiKUVPpdbD7+QaONE1vsBuy72VFZISOmPeBel1xbYwKhVESQQjeV5I4ePEDr7BI7W4IlUfGDB7D6fc1J8w==}
     engines: {node: '>=22.0.0'}
 
   '@hono/node-server@2.1.5':
@@ -1400,7 +1400,7 @@ snapshots:
   '@esbuild/win32-x64@0.28.2':
     optional: true
 
-  '@ferrlabs/mcp-core@10.13.0(zod@4.6.7)':
+  '@ferrlabs/mcp-core@10.14.0(zod@4.6.7)':
     dependencies:
       '@modelcontextprotocol/sdk': 1.32.1(zod@4.6.7)
     transitivePeerDependencies:
