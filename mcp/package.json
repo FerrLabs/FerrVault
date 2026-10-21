@@ -1,7 +1,7 @@
 {
   "name": "@ferrvault/mcp-workspace",
   "private": true,
-  "version": "11.0.0",
+  "version": "11.0.1",
   "description": "FerrVault MCP servers: workspace root",
   "license": "MPL-2.0",
   "type": "module",
