@@ -38,6 +38,9 @@ metadata:
     {{- include "ferrvault-operator.labels" . | nindent 4 }}
 rules:
   {{- include "ferrvault-operator.leaseRules" . | nindent 2 }}
+  - apiGroups: [""]
+    resources: [events]
+    verbs: [create, patch]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
