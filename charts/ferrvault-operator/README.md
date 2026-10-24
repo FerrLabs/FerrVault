@@ -49,7 +49,7 @@ kubectl delete crd ferrvaultsecrets.ferrvault.com ferrvaultconnections.ferrvault
 | `replicaCount` | `1` | Raise when using leader election for HA. |
 | `leaderElection.enabled` | `true` | |
 | `leaderElection.id` | `ferrvault-operator.ferrvault.com` | Change to run multiple isolated instances in one cluster. |
-| `watchNamespace` | `""` (cluster-wide) | Single namespace scope when set. |
+| `watchNamespace` | `""` (cluster-wide) | Single namespace scope when set. RBAC is then a namespaced `Role` and `RoleBinding` in that namespace instead of a `ClusterRole`. |
 | `defaultRefreshInterval` | `1h` | Fallback for `FerrVaultSecret.spec.refreshInterval`. |
 | `stallThreshold` | `15m` | Liveness fails when no reconcile completes for this long while FerrVault resources exist. Keep it above the 10m connection probe interval. |
 | `reconcileTimeout` | `2m` | A single reconcile is cancelled after this long, so one call that never returns cannot hold the work queue. The operator refuses to start below about 31s, the longest one FerrVault API call can take with its three 10s attempts and backoff. |
