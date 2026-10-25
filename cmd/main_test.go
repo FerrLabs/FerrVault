@@ -1,9 +1,10 @@
 package main
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	"testing"
 	"time"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 func TestReconcileTimeoutCannotDisableTheGuardrail(t *testing.T) {
