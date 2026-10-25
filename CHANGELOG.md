@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [6.1.1] - 2026-10-25
+
+### Bug Fixes
+
+- perf(operator): stop caching the content of every Secret in the cluster (#327)
+
 ## [6.1.0] - 2026-10-25
 
 ### Features
