@@ -12,6 +12,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -121,11 +122,7 @@ func main() {
 		// runs when a secret's content actually changed.
 		Client: client.Options{
 			Cache: &client.CacheOptions{
-				DisableFor: []client.Object{
-					&appsv1.Deployment{},
-					&appsv1.StatefulSet{},
-					&appsv1.DaemonSet{},
-				},
+				DisableFor: uncachedReadKinds(),
 			},
 		},
 	})
@@ -189,6 +186,15 @@ func fmtNs(ns string) string {
 		return "<cluster-wide>"
 	}
 	return fmt.Sprintf("%q", ns)
+}
+
+func uncachedReadKinds() []client.Object {
+	return []client.Object{
+		&appsv1.Deployment{},
+		&appsv1.StatefulSet{},
+		&appsv1.DaemonSet{},
+		&corev1.Secret{},
+	}
 }
 
 func validateReconcileTimeout(d time.Duration) error {

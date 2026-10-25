@@ -278,7 +278,7 @@ func (r *FerrVaultSecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&fvv1alpha1.FerrVaultSecret{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
-		Owns(&corev1.Secret{}).
+		Owns(&corev1.Secret{}, builder.OnlyMetadata).
 		Watches(
 			&fvv1alpha1.FerrVaultConnection{},
 			handler.EnqueueRequestsFromMapFunc(r.secretsReferencingConnection),
@@ -286,6 +286,7 @@ func (r *FerrVaultSecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.secretsReferencingTokenSecret),
+			builder.OnlyMetadata,
 		).
 		Named("ferrvaultsecret").
 		Complete(r)
