@@ -4,6 +4,12 @@ All notable changes to `ferrvault-mcp` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [11.0.2] - 2026-10-25
+
+### Bug Fixes
+
+- fix(deps): override body-parser for GHSA-27r3-jxmh-p828 (#328)
+
 ## [11.0.1] - 2026-10-21
 
 ### Bug Fixes
