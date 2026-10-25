@@ -23,7 +23,7 @@ leaderElection:
 
 # --- Scope ---
 # Empty string = cluster-wide (operator watches every namespace). Set to a
-# namespace name to restrict the informer cache to a single namespace.
+# namespace name to restrict the informer cache and the RBAC to a single namespace.
 watchNamespace: ""
 
 # --- Runtime flags ---

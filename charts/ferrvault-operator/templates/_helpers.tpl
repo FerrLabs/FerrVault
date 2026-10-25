@@ -71,3 +71,30 @@ with the chart version released together.
 {{- define "ferrvault-operator.imageTag" -}}
 {{- default .Chart.AppVersion .Values.image.tag }}
 {{- end }}
+
+{{- define "ferrvault-operator.rules" -}}
+- apiGroups: ["ferrvault.com"]
+  resources: [ferrvaultsecrets, ferrvaultconnections]
+  verbs: [get, list, watch, create, update, patch, delete]
+- apiGroups: ["ferrvault.com"]
+  resources: [ferrvaultsecrets/status, ferrvaultconnections/status]
+  verbs: [get, update, patch]
+- apiGroups: ["ferrvault.com"]
+  resources: [ferrvaultsecrets/finalizers, ferrvaultconnections/finalizers]
+  verbs: [update]
+- apiGroups: [apps]
+  resources: [deployments, statefulsets, daemonsets]
+  verbs: [get, patch]
+- apiGroups: [""]
+  resources: [secrets]
+  verbs: [get, list, watch, create, update, patch]
+- apiGroups: [""]
+  resources: [events]
+  verbs: [create, patch]
+{{- end }}
+
+{{- define "ferrvault-operator.leaseRules" -}}
+- apiGroups: ["coordination.k8s.io"]
+  resources: [leases]
+  verbs: [get, list, watch, create, update, patch, delete]
+{{- end }}
