@@ -239,7 +239,7 @@ func (r *FerrVaultConnectionReconciler) SetupWithManager(mgr ctrl.Manager) error
 				}
 				return reqs
 			}),
-			builder.WithPredicates(),
+			builder.OnlyMetadata,
 		).
 		Named("ferrvaultconnection").
 		Complete(r)

@@ -3,6 +3,8 @@ package main
 import (
 	"testing"
 	"time"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 func TestReconcileTimeoutCannotDisableTheGuardrail(t *testing.T) {
@@ -17,4 +19,13 @@ func TestTheDefaultReconcileTimeoutIsAccepted(t *testing.T) {
 	if err := validateReconcileTimeout(2 * time.Minute); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestSecretsAreNeverServedFromTheTypedCache(t *testing.T) {
+	for _, obj := range uncachedReadKinds() {
+		if _, ok := obj.(*corev1.Secret); ok {
+			return
+		}
+	}
+	t.Fatal("Secret reads go through the cache, which holds every Secret in the cluster in memory")
 }
