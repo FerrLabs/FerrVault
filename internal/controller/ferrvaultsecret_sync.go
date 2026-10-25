@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -17,6 +18,25 @@ import (
 
 	fvv1alpha1 "github.com/FerrLabs/FerrVault/api/ferrvault/v1alpha1"
 )
+
+const fvAnnotationManagedBy = "ferrvault.com/managed-by"
+
+var errTargetConflict = errors.New("target Secret exists and is not managed by this operator")
+
+func adoptable(secret *corev1.Secret, cr *fvv1alpha1.FerrVaultSecret, allowUnmanaged bool) bool {
+	if secret.ResourceVersion == "" || allowUnmanaged {
+		return true
+	}
+	if _, ok := secret.Annotations[fvAnnotationManagedBy]; ok {
+		return true
+	}
+	for _, ref := range secret.OwnerReferences {
+		if ref.UID == cr.UID {
+			return true
+		}
+	}
+	return false
+}
 
 func (r *FerrVaultSecretReconciler) loadToken(ctx context.Context, conn *fvv1alpha1.FerrVaultConnection) (string, error) {
 	broker := r.Broker
@@ -47,6 +67,9 @@ func (r *FerrVaultSecretReconciler) ensureTargetSecret(
 	}
 	var oldHash string
 	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, secret, func() error {
+		if !adoptable(secret, cr, !owned) {
+			return fmt.Errorf("%w: %s/%s", errTargetConflict, secret.Namespace, secret.Name)
+		}
 		if existing, ok := secret.Annotations[fvAnnotationContentHash]; ok {
 			oldHash = existing
 		}
@@ -61,7 +84,7 @@ func (r *FerrVaultSecretReconciler) ensureTargetSecret(
 		if secret.Annotations == nil {
 			secret.Annotations = map[string]string{}
 		}
-		secret.Annotations["ferrvault.com/managed-by"] = "ferrvault-operator"
+		secret.Annotations[fvAnnotationManagedBy] = "ferrvault-operator"
 		secret.Annotations[fvAnnotationContentHash] = newHash
 		secret.StringData = nil
 		secret.Data = secretBytes(data)

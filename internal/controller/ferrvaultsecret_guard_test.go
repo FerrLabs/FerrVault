@@ -240,3 +240,66 @@ func TestOrdinaryTargetIsStillOwned(t *testing.T) {
 		t.Fatalf("ordinary target lost its controller reference: %+v", s.OwnerReferences)
 	}
 }
+
+func TestUnmanagedExistingTargetIsNotOverwritten(t *testing.T) {
+	existing := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "tls"},
+		Type:       corev1.SecretTypeTLS,
+		Data:       map[string][]byte{"tls.crt": []byte("crt"), "extra": []byte("keep")},
+	}
+	f := newGuardFixture(t, "tls", nil, partialVault{secrets: map[string]string{"A": "a"}}, existing)
+
+	f.reconcile(t)
+
+	s, _ := f.secret(t, "tls")
+	if string(s.Data["extra"]) != "keep" || string(s.Data["tls.crt"]) != "crt" || s.Data["A"] != nil {
+		t.Fatalf("unmanaged Secret was rewritten: %v", s.Data)
+	}
+	if s.Type != corev1.SecretTypeTLS || len(s.OwnerReferences) != 0 || s.Annotations[fvAnnotationManagedBy] != "" {
+		t.Fatalf("unmanaged Secret was adopted: type=%s owners=%v annotations=%v", s.Type, s.OwnerReferences, s.Annotations)
+	}
+	cond := f.ready(t)
+	if cond == nil || cond.Status != metav1.ConditionFalse || cond.Reason != "TargetConflict" {
+		t.Fatalf("want Ready=False TargetConflict, got %+v", cond)
+	}
+}
+
+func TestManagedExistingTargetIsStillUpdated(t *testing.T) {
+	existing := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:   "default",
+			Name:        "runtime",
+			Annotations: map[string]string{fvAnnotationManagedBy: "ferrvault-operator"},
+		},
+		Data: map[string][]byte{"A": []byte("a-old")},
+	}
+	f := newGuardFixture(t, "runtime", nil, partialVault{secrets: map[string]string{"A": "a-new"}}, existing)
+
+	f.reconcile(t)
+
+	s, _ := f.secret(t, "runtime")
+	if secretValue(s, "A") != "a-new" {
+		t.Fatalf("managed Secret was not updated: %v", s.Data)
+	}
+	if cond := f.ready(t); cond == nil || cond.Reason != "Synced" {
+		t.Fatalf("want Synced, got %+v", cond)
+	}
+}
+
+func TestExistingTargetOwnedByTheCRIsStillUpdated(t *testing.T) {
+	controller := true
+	existing := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "runtime", OwnerReferences: []metav1.OwnerReference{{
+			APIVersion: fvv1alpha1.GroupVersion.String(), Kind: "FerrVaultSecret", Name: "sync", UID: guardOwnerUID, Controller: &controller,
+		}}},
+		Data: map[string][]byte{"A": []byte("a-old")},
+	}
+	f := newGuardFixture(t, "runtime", nil, partialVault{secrets: map[string]string{"A": "a-new"}}, existing)
+
+	f.reconcile(t)
+
+	s, _ := f.secret(t, "runtime")
+	if secretValue(s, "A") != "a-new" {
+		t.Fatalf("owned Secret was not updated: %v", s.Data)
+	}
+}
