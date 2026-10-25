@@ -2,12 +2,14 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"sync"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -195,6 +197,9 @@ func (r *FerrVaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	secret, _, err := r.ensureTargetSecret(ctx, &cr, transformed, newHash, !tokenTarget)
+	if errors.Is(err, errTargetConflict) {
+		return r.failReady(ctx, &cr, "TargetConflict", err.Error())
+	}
 	if err != nil {
 		return r.failReady(ctx, &cr, "SecretWriteFailed", err.Error())
 	}

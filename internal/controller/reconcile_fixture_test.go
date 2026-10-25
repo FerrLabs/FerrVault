@@ -69,7 +69,7 @@ func newReconcileFixture(t *testing.T, upstream map[string]string, funcs interce
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:   "default",
 				Name:        "runtime",
-				Annotations: map[string]string{fvAnnotationContentHash: "content-before-the-change"},
+				Annotations: map[string]string{fvAnnotationContentHash: "content-before-the-change", fvAnnotationManagedBy: "ferrvault-operator"},
 			},
 		},
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "api"}},
