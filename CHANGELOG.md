@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [6.1.3] - 2026-10-26
+
+### Bug Fixes
+
+- fix(deps): bump ctutils, rustls-webpki and webpki-root-certs (#331)
+
 ## [6.1.2] - 2026-10-25
 
 ### Bug Fixes
