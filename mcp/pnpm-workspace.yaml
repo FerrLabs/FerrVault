@@ -1,6 +1,9 @@
 packages:
   - 'packages/*'
 
+minimumReleaseAgeExclude:
+  - '@ferrlabs/*'
+
 allowBuilds:
   esbuild: false
 overrides:
