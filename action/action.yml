@@ -138,7 +138,7 @@ runs:
             [[ -n "$line" ]] && echo "::add-mask::$line"
           done < "$valfile"
           if [[ "$EXPORT_ENV" == "true" ]]; then
-            delim="ghadelim_$(openssl rand -hex 16)"
+            delim="ghadelim_$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n')"
             if grep -qF -- "$delim" "$valfile"; then
               echo "::error::secret value contains the env delimiter, aborting" >&2
               exit 1
