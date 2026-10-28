@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [6.1.4] - 2026-10-28
+
+### Bug Fixes
+
+- fix(action): mask every line of multi-line secrets and randomize the env delimiter (#336)
+
 ## [6.1.3] - 2026-10-26
 
 ### Bug Fixes
