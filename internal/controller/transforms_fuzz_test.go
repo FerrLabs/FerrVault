@@ -2,6 +2,7 @@ package controller
 
 import (
 	"encoding/base64"
+	"errors"
 	"reflect"
 	"testing"
 
@@ -29,6 +30,9 @@ func FuzzApplyTransforms(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, kind uint8, key, val, affix, from, to string) {
 		typ := fuzzTransformTypes[int(kind)%len(fuzzTransformTypes)]
+		if key == "OTHER" {
+			t.Skip()
+		}
 		input := map[string]string{key: val, "OTHER": "o"}
 		snapshot := map[string]string{key: val, "OTHER": "o"}
 		transforms := []fvv1alpha1.SecretTransform{
@@ -40,7 +44,7 @@ func FuzzApplyTransforms(f *testing.F) {
 			t.Fatalf("input mutated: before %q after %q", snapshot, input)
 		}
 		if err != nil {
-			if _, ok := err.(*TransformError); !ok {
+			if te := (*TransformError)(nil); !errors.As(err, &te) {
 				t.Fatalf("error is %T, want *TransformError", err)
 			}
 		}
