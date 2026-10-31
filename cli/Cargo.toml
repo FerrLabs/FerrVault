@@ -1,6 +1,6 @@
 [package]
 name = "ferrvault-cli"
-version = "0.2.0"
+version = "1.0.0"
 license.workspace = true
 edition.workspace = true
 rust-version.workspace = true

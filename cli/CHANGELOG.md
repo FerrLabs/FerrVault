@@ -4,6 +4,12 @@ All notable changes to `ferrvault-cli` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.0.0] - 2026-10-31
+
+### Breaking Changes
+
+- feat(mcp)!: serve @ferrvault/mcp from the FerrVault API (#305)
+
 ## [0.2.0] - 2026-10-03
 
 ### Features
