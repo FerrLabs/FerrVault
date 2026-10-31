@@ -29,6 +29,9 @@ make fmt
 # Unit tests
 make test
 
+# Fuzz a target (see .github/workflows/fuzz.yml for the list)
+go test -run='^$' -fuzz=FuzzApplyTransforms -fuzztime=60s ./internal/controller
+
 # Integration tests (envtest)
 make test-integration
 
