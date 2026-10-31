@@ -124,8 +124,8 @@ fn parse_pin(s: &str) -> Result<[u8; 32]> {
 }
 
 fn hex_decode(s: &str) -> Result<Vec<u8>> {
-    if !s.len().is_multiple_of(2) {
-        return Err(anyhow!("odd hex length"));
+    if !s.is_ascii() || !s.len().is_multiple_of(2) {
+        return Err(anyhow!("hex must be an even number of ASCII characters"));
     }
     (0..s.len())
         .step_by(2)
@@ -265,5 +265,12 @@ mod tests {
     fn rejects_short_pin() {
         let res = parse_pin("deadbeef");
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn non_ascii_pin_is_an_error_not_a_panic() {
+        let pin = format!("a{}{}", "é", "a".repeat(61));
+        assert_eq!(pin.len(), 64);
+        assert!(parse_pin(&pin).is_err());
     }
 }
