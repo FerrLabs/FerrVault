@@ -1,13 +1,13 @@
 <div align="center">
 
-# FerrVault Operator
+<h1><img src=".github/logo.svg" alt="" width="48" height="48" align="absmiddle"> FerrVault</h1>
 
-**Secrets from FerrVault, as native Kubernetes Secrets.**
+**Open source clients for FerrVault: Kubernetes operator, CLI, GitHub Action and MCP server.**
 
-Your workloads read a normal `Secret`. The operator keeps it in sync with the vault,<br />
-garbage-collects it with the CR, and reports drift through status conditions.
+Fetch secrets from a vault and hand them to a cluster, a process, a workflow or an AI assistant.
 
-[![Latest release](https://img.shields.io/github/v/release/FerrLabs/FerrVault)](https://github.com/FerrLabs/FerrVault/releases/latest)
+[![Operator release](https://img.shields.io/github/v/release/FerrLabs/FerrVault?filter=v*&label=operator)](https://github.com/FerrLabs/FerrVault/releases)
+[![CI](https://github.com/FerrLabs/FerrVault/actions/workflows/ci.yml/badge.svg)](https://github.com/FerrLabs/FerrVault/actions/workflows/ci.yml)
 [![Quality Gate](https://sonar.ferrlabs.com/api/project_badges/measure?project=FerrVault&metric=alert_status&token=sqb_d3cde9fc7a86f70e3652d22ce13b5a39522212c8)](https://sonar.ferrlabs.com/dashboard?id=FerrVault)
 [![Coverage](https://sonar.ferrlabs.com/api/project_badges/measure?project=FerrVault&metric=coverage&token=sqb_d3cde9fc7a86f70e3652d22ce13b5a39522212c8)](https://sonar.ferrlabs.com/dashboard?id=FerrVault)
 [![License](https://img.shields.io/github/license/FerrLabs/FerrVault)](LICENSE)
@@ -17,17 +17,29 @@ garbage-collects it with the CR, and reports drift through status conditions.
 
 </div>
 
-> [!WARNING]
-> **Alpha.** The reconciler reads secrets from a vault through the bulk-reveal API and
-> materialises them into a Kubernetes Secret, with owner-ref GC and status conditions. Rolling
-> restarts, the Helm chart and integration tests are tracked in
-> [issue #1](https://github.com/FerrLabs/FerrVault/issues/1).
+## What is in this repository
 
-## Custom resources
+| Directory | What | Released as | Tags |
+| --- | --- | --- | --- |
+| repository root, [`cmd`](cmd), [`internal`](internal), [`api`](api), [`charts`](charts) | Kubernetes operator (Go) | `ghcr.io/ferrlabs/ferrvault-operator` and the `ferrvault-operator` Helm chart | `v*` |
+| [`cli`](cli) | `ferrvault` command line client (Rust), see [`cli/README.md`](cli/README.md) | binaries on [GitHub releases](https://github.com/FerrLabs/FerrVault/releases) | `cli-v*` |
+| [`action`](action) | GitHub Action that injects secrets as masked env vars, see [`action/README.md`](action/README.md) | the repository tag | `v*` |
+| [`mcp`](mcp) | MCP server, see [`mcp/README.md`](mcp/README.md) | [`@ferrvault/mcp`](https://www.npmjs.com/package/@ferrvault/mcp) on npm | `mcp-v*` |
+
+The rest of this README covers the operator.
+
+> [!NOTE]
+> The CRDs are `ferrvault.com/v1alpha1`, so their schema can still change.
+
+## Kubernetes operator
+
+Secrets from FerrVault, as native Kubernetes Secrets. Your workloads read a normal `Secret`. The operator keeps it in sync with the vault, garbage-collects it with the CR, and reports drift through status conditions.
+
+### Custom resources
 
 Two CRDs under `ferrvault.com/v1alpha1`:
 
-### `FerrVaultConnection` (shortname `fvc`)
+#### `FerrVaultConnection` (shortname `fvc`)
 
 Declares how to reach a FerrVault instance. Shared by every `FerrVaultSecret` in that namespace that references it.
 
@@ -47,7 +59,7 @@ The referenced Secret must hold a FerrVault service-account token (`fvsat_...`),
 
 `mode: cloud` targets the legacy FerrLabs-Cloud API instead. It then requires `organization` on the connection and `project` on every `FerrVaultSecret`; both fields are ignored in the default `ferrvault` mode.
 
-### `FerrVaultSecret` (shortname `fvs`)
+#### `FerrVaultSecret` (shortname `fvs`)
 
 Declares a sync from a vault to a Kubernetes Secret.
 
@@ -71,7 +83,7 @@ On reconciliation the operator calls `POST /operator/secrets/reveal` once (`GET 
 
 The generated Secret is owned by the CR, so deleting the CR garbage-collects the Secret.
 
-#### Value transforms
+##### Value transforms
 
 Revealed values can be reshaped before they land in the target Secret via `spec.transforms`. Transforms are applied in order; each one sees the output of the previous step.
 
@@ -105,9 +117,9 @@ Supported types:
 
 Malformed transforms (unknown type, invalid base64, non-object JSON, destination-key collisions) leave the CR in `Ready=False` with `Reason=TransformError` and increment `ferrvault_secret_sync_errors_total{reason="TransformError"}`. The target Secret is not written on failure, so workloads keep the last known-good value.
 
-## Running
+### Running
 
-### Helm (recommended)
+#### Helm (recommended)
 
 ```bash
 helm install ferrvault-operator oci://ghcr.io/ferrlabs/charts/ferrvault-operator \
@@ -116,14 +128,14 @@ helm install ferrvault-operator oci://ghcr.io/ferrlabs/charts/ferrvault-operator
 
 Upgrade: `helm upgrade` against the same release. CRDs carry `helm.sh/resource-policy: keep` so they survive uninstall (protects your CRs + managed Secrets). See [`charts/ferrvault-operator/README.md`](charts/ferrvault-operator/README.md) for the full `values.yaml` reference.
 
-### Locally against a cluster
+#### Locally against a cluster
 
 ```bash
 make install-crds   # CRDs only
 make run            # runs the manager as your user, not as a Pod
 ```
 
-### Raw manifests (without Helm at runtime)
+#### Raw manifests (without Helm at runtime)
 
 The Helm chart is the single source of truth for all manifests (CRDs, RBAC,
 ServiceAccount, Deployment). If your cluster policy forbids running Helm at
@@ -140,7 +152,7 @@ kubectl apply -f manager.yaml
 No duplicate `config/rbac/` or `config/crd/` lives in the repo; anything
 rendered from the chart *is* the canonical version.
 
-## Monitoring
+### Monitoring
 
 A stuck operator looks healthy from the outside: the pod stays `Running`, and every `FerrVaultSecret` keeps the last condition it wrote. So the signals that matter come from outside the reconcile loop.
 
@@ -162,17 +174,13 @@ The first two catch a stuck loop within minutes whatever the refresh interval. `
 
 One gap to know about: a `FerrVaultSecret` that has never synced once has no last-sync series, so it cannot be stale and none of these alerts fire for it. `kubectl get fvs` still shows `Ready=False`, with the reason in `kubectl describe`. Tracked in #277.
 
-## Prerequisites in FerrVault
+### Prerequisites in FerrVault
 
 The operator relies on endpoints in [`FerrLabs/FerrVault-Cloud`](https://github.com/FerrLabs/FerrVault-Cloud) that shipped in `api@v4.0.0`:
 
 - API token auth (`Authorization: Bearer fft_...`) with granular scopes (#268)
 - `secrets:read` scope enforcement on all secrets routes (#268)
 - Bulk reveal endpoint (#277)
-
-## MCP server
-
-[`mcp/`](mcp) holds the Model Context Protocol server for FerrVault, [`@ferrvault/mcp`](https://www.npmjs.com/package/@ferrvault/mcp). It talks to the FerrVault API directly and is released on its own `mcp-v*` tags.
 
 ## Contributing
 
