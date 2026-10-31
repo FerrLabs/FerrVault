@@ -37,7 +37,7 @@ inputs:
     required: false
     default: ''
   cli-version:
-    description: 'ferrvault CLI version to install. Defaults to the version that ships with this action revision.'
+    description: 'ferrvault CLI version to install. Defaults to the latest published cli-v* release; pin an explicit tag for reproducible runs.'
     required: false
     default: 'latest'
 
@@ -46,21 +46,25 @@ runs:
   steps:
     - name: Validate inputs
       shell: bash
+      env:
+        TOKEN: ${{ inputs.token }}
+        FETCH_ALL: ${{ inputs.all }}
+        NAMES_INPUT: ${{ inputs.names }}
       run: |
         set -euo pipefail
-        if [[ -z "${{ inputs.token }}" ]]; then
+        if [[ -z "$TOKEN" ]]; then
           echo "::error::token is required" >&2
           exit 1
         fi
-        case "${{ inputs.token }}" in
+        case "$TOKEN" in
           fvsat_*) ;;
           *) echo "::error::token does not start with fvsat_ — refusing to send a non-FerrVault token" >&2; exit 1;;
         esac
-        if [[ "${{ inputs.all }}" == "true" && -n "${{ inputs.names }}" ]]; then
+        if [[ "$FETCH_ALL" == "true" && -n "$NAMES_INPUT" ]]; then
           echo "::error::all and names are mutually exclusive" >&2
           exit 1
         fi
-        if [[ "${{ inputs.all }}" != "true" && -z "${{ inputs.names }}" ]]; then
+        if [[ "$FETCH_ALL" != "true" && -z "$NAMES_INPUT" ]]; then
           echo "::error::either all=true or names=A,B,C is required" >&2
           exit 1
         fi
@@ -99,9 +103,14 @@ runs:
         fi
         url="https://github.com/FerrLabs/FerrVault/releases/download/${VERSION}/ferrvault-${os}-${arch}.tar.gz"
         echo "Downloading $url"
-        curl -fsSLo /tmp/fv.tgz "$url"
-        tar -xzf /tmp/fv.tgz -C /tmp
-        sudo install -m 0755 /tmp/ferrvault /usr/local/bin/ferrvault
+        workdir="$(mktemp -d)"
+        trap 'rm -rf "$workdir"' EXIT
+        curl -fsSLo "$workdir/fv.tgz" "$url"
+        curl -fsSLo "$workdir/fv.tgz.sha256" "${url}.sha256"
+        expected="$(awk '{print $1; exit}' "$workdir/fv.tgz.sha256")"
+        echo "${expected}  $workdir/fv.tgz" | sha256sum -c -
+        tar -xzf "$workdir/fv.tgz" -C "$workdir" ferrvault
+        sudo install -m 0755 "$workdir/ferrvault" /usr/local/bin/ferrvault
         ferrvault --version
 
     - name: Fetch secrets
