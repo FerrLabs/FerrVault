@@ -4,6 +4,12 @@ All notable changes to `ferrvault-mcp` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [11.0.5] - 2026-11-01
+
+### Bug Fixes
+
+- fix(deps): update dependency @ferrlabs/mcp-core to ^10.14.4 (#343)
+
 ## [11.0.4] - 2026-10-28
 
 ### Bug Fixes

@@ -1,6 +1,6 @@
 {
   "name": "@ferrvault/mcp",
-  "version": "11.0.4",
+  "version": "11.0.5",
   "description": "Model Context Protocol server for the FerrVault API: vaults, environments, secrets and service tokens",
   "license": "MPL-2.0",
   "type": "module",
