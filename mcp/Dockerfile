@@ -1,6 +1,6 @@
 ARG PACKAGE=@ferrvault/mcp
 
-FROM node:24-alpine AS build
+FROM node:26-alpine AS build
 ARG PACKAGE
 WORKDIR /app
 ENV HUSKY=0 \
@@ -13,7 +13,7 @@ RUN pnpm install --frozen-lockfile --offline
 RUN pnpm run build
 RUN pnpm --filter "${PACKAGE}" deploy --prod --legacy /out
 
-FROM node:24-alpine
+FROM node:26-alpine
 WORKDIR /app
 ENV NODE_ENV=production \
     FERRLABS_MCP_MODE=http \
