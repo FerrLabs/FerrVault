@@ -17,7 +17,15 @@ spec:
       serviceAccountName: ferrvault-operator
       containers:
         - name: manager
-          image: ghcr.io/ferrlabs/ferrvault-operator:latest
+          image: ghcr.io/ferrlabs/ferrvault-operator:0.1.0
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+              ephemeral-storage: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
           volumeMounts:
             - name: ferrvault-token
               mountPath: /var/run/secrets/ferrvault
