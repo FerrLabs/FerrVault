@@ -301,9 +301,9 @@ async function run(): Promise<number> {
   return 1;
 }
 
-run()
-  .then((code) => process.exit(code))
-  .catch((err: unknown) => {
-    console.error('Smoke aborted:', err instanceof Error ? err.message : err);
-    process.exit(1);
-  });
+try {
+  process.exit(await run());
+} catch (err: unknown) {
+  console.error('Smoke aborted:', err instanceof Error ? err.message : err);
+  process.exit(1);
+}
