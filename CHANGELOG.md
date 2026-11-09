@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [6.1.6] - 2026-11-09
+
+### Bug Fixes
+
+- fix: sonar security and quick wins (#351)
+
 ## [6.1.5] - 2026-10-31
 
 ### Bug Fixes

@@ -4,6 +4,12 @@ All notable changes to `ferrvault-mcp` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [11.0.6] - 2026-11-09
+
+### Bug Fixes
+
+- fix: sonar security and quick wins (#351)
+
 ## [11.0.5] - 2026-11-01
 
 ### Bug Fixes
