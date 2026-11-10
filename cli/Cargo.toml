@@ -48,6 +48,7 @@ tempfile = "3"
 
 [lints.rust]
 unsafe_code = "forbid"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
 
 [lints.clippy]
 all = { level = "warn", priority = -1 }
