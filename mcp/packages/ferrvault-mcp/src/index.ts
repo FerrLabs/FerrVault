@@ -6,6 +6,7 @@ try {
   await runMcp({
     name: 'ferrvault',
     version: readPackageVersion(import.meta.url),
+    scopes: ['secrets:read', 'secrets:write'],
     register,
   });
 } catch (err: unknown) {
