@@ -4,6 +4,12 @@ All notable changes to `ferrvault-mcp` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [11.0.9] - 2026-11-13
+
+### Bug Fixes
+
+- fix(mcp): request the FerrVault scopes when authorizing (#354)
+
 ## [11.0.8] - 2026-11-12
 
 ### Bug Fixes
