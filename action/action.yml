@@ -10,7 +10,7 @@ inputs:
     description: 'FerrVault API base URL, e.g. https://api.ferrvault.example.com'
     required: true
   token:
-    description: 'FerrVault service-account token (fvsat_...). Pass via ${{ secrets.FERRVAULT_TOKEN }} — never inline.'
+    description: 'FerrVault service-account token (fvsat_...). Pass it from a repository or organization secret, never inline.'
     required: true
   names:
     description: 'Comma- or newline-separated list of secret names. Omit (with all: true) to fetch every secret in the vault.'
