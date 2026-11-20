@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [6.1.8] - 2026-11-20
+
+### Bug Fixes
+
+- fix(action): fetch checksum from the real .sha256 asset name (#373)
+
 ## [6.1.7] - 2026-11-19
 
 ### Bug Fixes
