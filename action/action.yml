@@ -106,7 +106,7 @@ runs:
         workdir="$(mktemp -d)"
         trap 'rm -rf "$workdir"' EXIT
         curl -fsSLo "$workdir/fv.tgz" "$url"
-        curl -fsSLo "$workdir/fv.tgz.sha256" "${url}.sha256"
+        curl -fsSLo "$workdir/fv.tgz.sha256" "${url%.tar.gz}.sha256"
         expected="$(awk '{print $1; exit}' "$workdir/fv.tgz.sha256")"
         echo "${expected}  $workdir/fv.tgz" | sha256sum -c -
         tar -xzf "$workdir/fv.tgz" -C "$workdir" ferrvault
