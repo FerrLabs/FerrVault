@@ -131,6 +131,10 @@ runs:
         out="$(mktemp)"
         trap 'shred -u "$out" 2>/dev/null || rm -f "$out"' EXIT
 
+        for var in FERRVAULT_CA_CERT FERRVAULT_PIN_SHA256; do
+          [[ -n "${!var:-}" ]] || unset "$var"
+        done
+
         if [[ "$FETCH_ALL" == "true" ]]; then
           ferrvault get --all --format json > "$out"
         else
