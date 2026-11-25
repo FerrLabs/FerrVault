@@ -4,9 +4,12 @@ use anyhow::{Context, Result, anyhow};
 use keyring_core::{Entry, Error as KeyringError};
 use zeroize::Zeroizing;
 
+use crate::session::Session;
+
 const SERVICE: &str = "ferrvault-cli";
 const TOKEN_KEY: &str = "token";
 const URL_KEY: &str = "api_url";
+const SESSION_KEY: &str = "session";
 
 fn open_entry(key: &str, slot: &str) -> Result<Entry> {
     static STORE: OnceLock<Result<(), String>> = OnceLock::new();
@@ -92,6 +95,32 @@ impl CredentialStore {
         match open_entry(URL_KEY, "url")?.delete_credential() {
             Ok(()) | Err(KeyringError::NoEntry) => Ok(()),
             Err(e) => Err(anyhow!("deleting url from OS keyring: {e}")),
+        }
+    }
+
+    pub fn save_session(session: &Session) -> Result<()> {
+        let json = Zeroizing::new(serde_json::to_string(session).context("encoding session")?);
+        open_entry(SESSION_KEY, "session")?
+            .set_password(&json)
+            .context("writing session to OS keyring")?;
+        Ok(())
+    }
+
+    pub fn load_session() -> Result<Option<Session>> {
+        let raw = match open_entry(SESSION_KEY, "session")?.get_password() {
+            Ok(p) => Zeroizing::new(p),
+            Err(KeyringError::NoEntry) => return Ok(None),
+            Err(e) => return Err(anyhow!("reading session from OS keyring: {e}")),
+        };
+        serde_json::from_str(&raw)
+            .map(Some)
+            .context("decoding stored session; run `ferrvault login` again")
+    }
+
+    pub fn delete_session() -> Result<()> {
+        match open_entry(SESSION_KEY, "session")?.delete_credential() {
+            Ok(()) | Err(KeyringError::NoEntry) => Ok(()),
+            Err(e) => Err(anyhow!("deleting session from OS keyring: {e}")),
         }
     }
 }

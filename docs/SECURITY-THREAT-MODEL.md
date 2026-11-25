@@ -9,6 +9,7 @@ GitHub Action wrapper. Server-side concerns are tracked in
 | Asset | Where it lives | Sensitivity |
 | --- | --- | --- |
 | Service-account token (`fvsat_...`) | OS keyring; process env vars; HTTP headers in flight | **Critical** — direct vault read access bound to one (vault, role) |
+| OAuth session (access + refresh token) | OS keyring (`session` slot); HTTP headers and IdP request bodies in flight | **Critical** — user-wide: reaches every org and vault the account can, not one (vault, role). The refresh token outlives the short-lived access token and rotates on every use |
 | Decrypted secret values | CLI process memory; child process env | **Critical** — what the SAT exists to fetch |
 | `FERRVAULT_URL` | OS keyring or env | Medium — disclosing tenant URL helps targeted phishing |
 | `FERRVAULT_PIN_SHA256` | Env or flag | Low — public information; integrity-only |
@@ -61,6 +62,19 @@ Boundary (b): the network between the CLI and the FerrVault API.
 | Stolen client cert (mTLS) | `--client-cert` + `--client-key` supported; key file must be 0600. Treat client keys with the same care as tokens. | ✅ |
 | Forgotten `--insecure-skip-verify` in a script | Flag refuses to take effect unless `FERRVAULT_INSECURE_I_KNOW_WHAT_I_AM_DOING=yes` is also in env. A dev who used it locally and forgot to remove it gets a hard error in CI, not a silent MITM-able session. | ✅ |
 | Token leaked via verbose proxy logging | The CLI sends `Authorization: Bearer fvsat_...` in headers only, never in URLs. | ✅ |
+
+### T2b — OAuth login and session
+
+| Threat | Mitigation | Status |
+| --- | --- | --- |
+| Authorization code injected or intercepted on the loopback redirect | PKCE S256 with a fresh 32-byte verifier per login; the code is useless without the verifier, which never leaves the process. | ✅ |
+| Forged callback (CSRF / login fixation) | Random `state` per login, compared to the callback; a mismatch aborts the login before any token exchange. The listener binds `127.0.0.1` only, on a random port, and serves a single login with a 5 minute timeout. | ✅ |
+| Session token used after the device is lost | Access tokens are short-lived; the refresh token is rotated on every refresh and the rotated pair is persisted before use. `logout` revokes the refresh token at the IdP (best effort, local copy is always cleared). | ✅ |
+| Revoked or expired session keeps being retried | A rejected refresh surfaces as "run `ferrvault login` again"; a 401 triggers at most one refresh and one replay per request. | ✅ |
+| Blast radius of a stolen session larger than a SAT | A session is user-wide, so prefer a SAT for CI and unattended jobs (least privilege: one vault, one role). Org and vault are pinned at login and sent as `x-ferrvault-org`; server-side authorization still decides every request. | ⚠ accepted, by design |
+| Vault TLS pin or client cert applied to the wrong host | The IdP client gets `--ca-cert` and the insecure gate only; `--pin-sha256` and mTLS apply to the FerrVault API alone. Both URLs must be `https://`. | ✅ |
+| Tokens in logs, output or history | Never printed; held in `Zeroizing` buffers without `Debug` impls; the session JSON is only ever written to the keyring. | ✅ |
+| TLS flags ignored on `login` | `login` and `logout` build their HTTP clients from the same TLS arguments as every other command (fixes #318). | ✅ |
 
 ### T3 — leak of decrypted values
 

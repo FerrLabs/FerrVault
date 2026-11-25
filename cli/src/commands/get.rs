@@ -12,7 +12,7 @@ pub async fn run(
     names: Vec<String>,
     format: OutputFormat,
 ) -> Result<()> {
-    let me = client.me().await?;
+    let vault = client.vault_slug().await?;
 
     let target: Option<Vec<String>> = match (name.clone(), all, names.is_empty()) {
         (Some(n), false, true) => Some(vec![n]),
@@ -26,7 +26,7 @@ pub async fn run(
         _ => return Err(anyhow!("--all conflicts with NAME and --names")),
     };
 
-    let resp = client.reveal(&me.vault_slug, target.as_deref()).await?;
+    let resp = client.reveal(&vault, target.as_deref()).await?;
 
     if !resp.missing.is_empty() {
         eprintln!(

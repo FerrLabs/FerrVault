@@ -42,10 +42,7 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    Login {
-        #[arg(long)]
-        url: Option<String>,
-    },
+    Login(LoginArgs),
     Logout,
     Whoami {
         #[arg(long)]
@@ -100,6 +97,27 @@ pub enum Command {
         #[arg(long, short)]
         yes: bool,
     },
+}
+
+#[derive(Debug, clap::Args)]
+pub struct LoginArgs {
+    #[arg(long)]
+    pub url: Option<String>,
+
+    #[arg(long, conflicts_with = "with_token")]
+    pub device: bool,
+
+    #[arg(long)]
+    pub with_token: bool,
+
+    #[arg(long, env = "FERRVAULT_IDP_URL")]
+    pub idp_url: Option<String>,
+
+    #[arg(long, env = "FERRVAULT_ORG")]
+    pub org: Option<String>,
+
+    #[arg(long, env = "FERRVAULT_VAULT")]
+    pub vault: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
