@@ -2,7 +2,7 @@ name: Publish
 
 # Runs the docker + helm publishers declared in `.ferrflow` after FerrFlow
 # cuts a release tag on main. `.ferrflow` carries `deferPublish: true`, so
-# the release job only versions and tags — publishing lives here, where the
+# the release job only versions and tags: publishing lives here, where the
 # build toolchain (buildx, helm) and GHCR auth are set up. `ferrflow publish`
 # resolves the released version from the git tag and runs each publisher
 # idempotently.
@@ -20,7 +20,7 @@ permissions:
 jobs:
   publish:
     name: Image + chart
-    # Skip the rolling major-only tag (e.g. `v4`) if one is ever created —
+    # Skip the rolling major-only tag (e.g. `v4`) if one is ever created:
     # the exact-version tag already published this version.
     if: github.event_name == 'workflow_dispatch' || contains(github.ref_name, '.')
     runs-on: ubuntu-latest
