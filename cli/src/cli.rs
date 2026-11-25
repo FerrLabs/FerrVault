@@ -118,6 +118,9 @@ pub struct LoginArgs {
 
     #[arg(long, env = "FERRVAULT_VAULT")]
     pub vault: Option<String>,
+
+    #[arg(long, env = "FERRVAULT_ENV")]
+    pub env: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]

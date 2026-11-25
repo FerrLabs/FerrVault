@@ -11,6 +11,7 @@ pub fn http_client() -> reqwest::Client {
 
 #[derive(Debug, Clone)]
 pub struct Recorded {
+    pub method: String,
     pub path: String,
     pub headers: Vec<(String, String)>,
     pub body: String,
@@ -22,6 +23,10 @@ impl Recorded {
             .iter()
             .find(|(k, _)| k.eq_ignore_ascii_case(name))
             .map(|(_, v)| v.as_str())
+    }
+
+    pub fn method_path(&self) -> String {
+        format!("{} {}", self.method, self.path)
     }
 
     pub fn json(&self) -> serde_json::Value {
@@ -112,7 +117,7 @@ async fn read_request(stream: &mut tokio::net::TcpStream) -> Option<Recorded> {
     let head = String::from_utf8_lossy(&buf[..head_end]).into_owned();
     let mut lines = head.lines();
     let mut first = lines.next()?.split(' ');
-    first.next()?;
+    let method = first.next()?.to_owned();
     let path = first.next()?.to_owned();
     let headers: Vec<(String, String)> = lines
         .filter_map(|l| l.split_once(':'))
@@ -132,6 +137,7 @@ async fn read_request(stream: &mut tokio::net::TcpStream) -> Option<Recorded> {
     }
     let body = String::from_utf8_lossy(&buf[head_end..]).into_owned();
     Some(Recorded {
+        method,
         path,
         headers,
         body,

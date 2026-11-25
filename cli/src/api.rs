@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
 use crate::session::{SessionAuth, SessionSummary};
+
+mod user;
 use crate::tls::{TlsOptions, build_client};
 
 pub enum Auth {
@@ -21,8 +23,6 @@ pub struct ApiConfig {
 }
 
 const ORG_HEADER: &str = "x-ferrvault-org";
-const ORGS_PATH: &str = "/user/orgs";
-const VAULTS_PATH: &str = "/user/vaults";
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Choice {
@@ -52,6 +52,7 @@ pub struct OperatorMe {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct InventoryItem {
     pub name: String,
+    #[serde(alias = "current_version")]
     pub version: i32,
     pub updated_at: DateTime<Utc>,
 }
@@ -62,8 +63,10 @@ pub struct BulkReadHit {
     #[serde(skip_serializing)]
     pub value: String,
     #[allow(dead_code)]
+    #[serde(alias = "current_version")]
     pub version: i32,
     #[allow(dead_code)]
+    #[serde(alias = "updated_at")]
     pub fetched_at: DateTime<Utc>,
 }
 
@@ -93,14 +96,6 @@ impl ApiClient {
         self.get_json("/operator/me").await
     }
 
-    pub async fn list_orgs(&self) -> Result<Vec<Choice>> {
-        self.get_json(ORGS_PATH).await
-    }
-
-    pub async fn list_vaults(&self) -> Result<Vec<Choice>> {
-        self.get_json(VAULTS_PATH).await
-    }
-
     pub async fn vault_slug(&self) -> Result<String> {
         match &self.cfg.auth {
             Auth::Sat(_) => Ok(self.me().await?.vault_slug),
@@ -119,10 +114,16 @@ impl ApiClient {
     }
 
     pub async fn inventory(&self) -> Result<Vec<InventoryItem>> {
-        self.get_json("/operator/secrets/list").await
+        match &self.cfg.auth {
+            Auth::Sat(_) => self.get_json("/operator/secrets/list").await,
+            Auth::Session(s) => self.user_inventory(s).await,
+        }
     }
 
     pub async fn reveal(&self, vault: &str, names: Option<&[String]>) -> Result<BulkReadResponse> {
+        if let Auth::Session(s) = &self.cfg.auth {
+            return self.user_reveal(s, names).await;
+        }
         let mut body = serde_json::json!({ "vault": vault });
         if let Some(names) = names {
             body["names"] = serde_json::json!(names);
@@ -139,6 +140,9 @@ impl ApiClient {
         name: &str,
         value: &str,
     ) -> Result<serde_json::Value> {
+        if let Auth::Session(s) = &self.cfg.auth {
+            return self.user_create(s, name, value).await;
+        }
         let body = serde_json::json!({ "vault": vault, "name": name, "value": value });
         let resp = self
             .send(Method::POST, "/operator/secrets", &[], Some(body))
@@ -152,6 +156,9 @@ impl ApiClient {
         name: &str,
         value: &str,
     ) -> Result<serde_json::Value> {
+        if let Auth::Session(s) = &self.cfg.auth {
+            return self.user_update(s, name, value).await;
+        }
         let body = serde_json::json!({ "vault": vault, "value": value });
         let resp = self
             .send(
@@ -165,6 +172,9 @@ impl ApiClient {
     }
 
     pub async fn delete_secret(&self, vault: &str, name: &str) -> Result<()> {
+        if let Auth::Session(s) = &self.cfg.auth {
+            return self.user_delete(s, name).await;
+        }
         let resp = self
             .send(
                 Method::DELETE,
@@ -345,6 +355,7 @@ mod tests {
             account: None,
             org: Some("acme".into()),
             vault: vault.map(str::to_owned),
+            environment: vault.map(|_| "default".to_owned()),
         };
         let auth = SessionAuth::new(
             session,
@@ -459,5 +470,157 @@ mod tests {
         let err = client.vault_slug().await.unwrap_err().to_string();
         assert!(err.contains("--vault"), "{err}");
         assert!(api.requests().is_empty());
+    }
+
+    fn secret_json(name: &str) -> serde_json::Value {
+        json!({"name": name, "value": format!("v-{name}"), "current_version": 3, "updated_at": "2026-11-25T10:00:00Z"})
+    }
+
+    const SECRETS: &str = "/vaults/prod/environments/default/secrets";
+
+    #[tokio::test]
+    async fn session_inventory_reads_the_environment_secret_list() {
+        let api = MockServer::start(|_| MockResponse::json(200, &json!([secret_json("A")]))).await;
+        let idp = rotating_idp().await;
+        let (client, _) = session_client(&api, &idp, 900, Some("prod"));
+        let items = client.inventory().await.unwrap();
+        assert_eq!((items[0].name.as_str(), items[0].version), ("A", 3));
+        assert_eq!(api.requests()[0].path, SECRETS);
+    }
+
+    #[tokio::test]
+    async fn session_reveal_of_names_is_one_batch_call() {
+        let api = MockServer::start(|r| {
+            let names = r.json()["names"].clone();
+            let hits: Vec<_> = names
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|n| secret_json(n.as_str().unwrap()))
+                .collect();
+            MockResponse::json(200, &json!(hits))
+        })
+        .await;
+        let idp = rotating_idp().await;
+        let (client, _) = session_client(&api, &idp, 900, Some("prod"));
+        let names = vec!["A".to_owned(), "B".to_owned()];
+        let resp = client.reveal("prod", Some(&names)).await.unwrap();
+        assert_eq!(resp.hits.len(), 2);
+        assert_eq!(resp.hits[1].value, "v-B");
+        let sent = api.requests();
+        assert_eq!(sent.len(), 1);
+        assert_eq!(sent[0].method_path(), format!("POST {SECRETS}:reveal"));
+        assert_eq!(sent[0].json(), json!({"names": ["A", "B"]}));
+    }
+
+    #[tokio::test]
+    async fn session_reveal_all_lists_first_and_chunks_at_the_server_limit() {
+        let names: Vec<String> = (0..501).map(|i| format!("S{i:03}")).collect();
+        let listed = names.clone();
+        let api = MockServer::start(move |r| {
+            if r.path == SECRETS {
+                let items: Vec<_> = listed.iter().map(|n| secret_json(n)).collect();
+                return MockResponse::json(200, &json!(items));
+            }
+            let asked = r.json()["names"].as_array().unwrap().clone();
+            assert!(asked.len() <= 500);
+            let hits: Vec<_> = asked
+                .iter()
+                .map(|n| secret_json(n.as_str().unwrap()))
+                .collect();
+            MockResponse::json(200, &json!(hits))
+        })
+        .await;
+        let idp = rotating_idp().await;
+        let (client, _) = session_client(&api, &idp, 900, Some("prod"));
+        let resp = client.reveal("prod", None).await.unwrap();
+        assert_eq!(resp.hits.len(), 501);
+        assert_eq!(api.requests_to(&format!("{SECRETS}:reveal")).len(), 2);
+    }
+
+    #[tokio::test]
+    async fn session_writes_use_the_environment_routes() {
+        let api = MockServer::start(|r| {
+            if r.method_path().starts_with("DELETE") {
+                MockResponse {
+                    status: 204,
+                    body: String::new(),
+                }
+            } else {
+                MockResponse::json(200, &json!({}))
+            }
+        })
+        .await;
+        let idp = rotating_idp().await;
+        let (client, _) = session_client(&api, &idp, 900, Some("prod"));
+        client.create_secret("prod", "NEW", "x").await.unwrap();
+        client.update_secret("prod", "NEW", "y").await.unwrap();
+        client.delete_secret("prod", "NEW").await.unwrap();
+        let sent = api.requests();
+        assert_eq!(sent[0].method_path(), format!("POST {SECRETS}"));
+        assert_eq!(sent[0].json(), json!({"name": "NEW", "value": "x"}));
+        assert_eq!(sent[1].method_path(), format!("PUT {SECRETS}/NEW"));
+        assert_eq!(sent[1].json(), json!({"value": "y"}));
+        assert_eq!(sent[2].method_path(), format!("DELETE {SECRETS}/NEW"));
+        assert!(
+            sent.iter()
+                .all(|r| r.header("x-ferrvault-org") == Some("acme"))
+        );
+    }
+
+    #[tokio::test]
+    async fn memberships_become_the_org_choices() {
+        let api = MockServer::start(|_| {
+            MockResponse::json(
+                200,
+                &json!({"user_id":"u","handle":"dev","org_id":null,"org_role":null,
+                        "memberships":[{"org_id":"org-1","role":"owner"},{"org_id":"org-2","role":null}]}),
+            )
+        })
+        .await;
+        let idp = rotating_idp().await;
+        let (client, _) = session_client(&api, &idp, 900, Some("prod"));
+        let orgs = client.list_orgs().await.unwrap();
+        assert_eq!(orgs.len(), 2);
+        assert_eq!(orgs[0].slug, "org-1");
+        assert_eq!(api.requests()[0].path, "/me");
+    }
+
+    #[tokio::test]
+    async fn session_without_an_environment_makes_no_secret_request() {
+        let api = MockServer::start(|_| MockResponse::json(200, &json!([]))).await;
+        let idp = rotating_idp().await;
+        let (client, _) = session_client(&api, &idp, 900, None);
+        assert!(client.inventory().await.is_err());
+        assert!(client.reveal("x", None).await.is_err());
+        assert!(api.requests().is_empty());
+    }
+
+    #[tokio::test]
+    async fn sat_requests_keep_using_operator_routes() {
+        let api = MockServer::start(|r| match r.path.as_str() {
+            "/operator/secrets/reveal" => MockResponse::json(
+                200,
+                &json!({"hits":[{"name":"A","value":"1","version":1,"fetched_at":"2026-11-25T10:00:00Z"}],"missing":["B"]}),
+            ),
+            _ => MockResponse::json(200, &json!([])),
+        })
+        .await;
+        let client = ApiClient::with_http(
+            ApiConfig {
+                base_url: api.url.clone(),
+                auth: Auth::Sat(Zeroizing::new("fvsat_abc".into())),
+            },
+            crate::testing::http_client(),
+        );
+        let resp = client
+            .reveal("prod", Some(&["A".to_owned(), "B".to_owned()]))
+            .await
+            .unwrap();
+        assert_eq!(resp.missing, ["B"]);
+        client.inventory().await.unwrap();
+        let sent = api.requests();
+        assert_eq!(sent[0].json(), json!({"vault":"prod","names":["A","B"]}));
+        assert_eq!(sent[1].path, "/operator/secrets/list");
     }
 }

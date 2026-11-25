@@ -23,8 +23,9 @@ ferrvault login --url https://api.ferrvault.example.com
 # Host without a browser: prints a short code to confirm on another device.
 ferrvault login --url https://api.ferrvault.example.com --device
 
-# Several organizations or vaults? Pick them up front (or answer the prompt).
-ferrvault login --url https://api.ferrvault.example.com --org acme --vault prod
+# Several organizations, vaults or environments? Pick them up front (or answer
+# the prompt). --org takes the organization id.
+ferrvault login --url https://api.ferrvault.example.com --org <org-id> --vault payments --env default
 
 # Service-account token (CI, scripts): unchanged.
 ferrvault login --url https://api.ferrvault.example.com --with-token
@@ -43,6 +44,12 @@ the rotated pair is written back to the keyring. If the refresh token is
 revoked or expired, run `ferrvault login` again. `FERRVAULT_TOKEN` and
 `--token` always win over a stored session.
 
+An OAuth session calls the same user routes as the FerrVault app, with the
+session as bearer token and the organization in `x-ferrvault-org`, so your
+vault roles apply and audit entries name you. It is scoped to the vault and
+environment chosen at login (re-run `login` to change them). With a session,
+`get --names` is all-or-nothing: one missing name fails the whole call.
+
 The identity provider defaults to `https://auth.ferrlabs.com`
 (`--idp-url` / `FERRVAULT_IDP_URL` to override). `--ca-cert` and
 `--insecure-skip-verify` apply to it as well; `--client-cert` and
@@ -54,7 +61,7 @@ The identity provider defaults to `https://auth.ferrlabs.com`
 | ----------------------------- | ----------------------------------------------------------- |
 | `ferrvault login`             | Log in (browser, `--device`, or SAT) and store the credentials in the OS keyring. |
 | `ferrvault logout`            | Revoke the OAuth session where possible, then forget url + credentials. |
-| `ferrvault whoami [--json]`   | Show the bound vault, role, label, and expiry (SAT) or account, org, vault and session expiry (OAuth). |
+| `ferrvault whoami [--json]`   | Show the bound vault, role, label, and expiry (SAT) or user, org and role, vault, environment and access token expiry (OAuth). |
 | `ferrvault list [--json]`     | List secret names + current version (no values).            |
 | `ferrvault get NAME`          | Print a single secret value to stdout.                      |
 | `ferrvault get --all`         | Print every secret (with `--format env/dotenv/json`).       |

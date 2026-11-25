@@ -132,11 +132,12 @@ async fn oauth_login(url: Url, args: &LoginArgs, tls: TlsArgs<'_>, device: bool)
     CredentialStore::delete_token()?;
 
     eprintln!(
-        "ferrvault: logged in to {} as {} (org={}, vault={}).",
+        "ferrvault: logged in to {} as {} (org={}, vault={}, env={}).",
         url,
         session.account.as_deref().unwrap_or("unknown account"),
         session.org.as_deref().unwrap_or("-"),
         session.vault.as_deref().unwrap_or("-"),
+        session.environment.as_deref().unwrap_or("-"),
     );
     Ok(())
 }
@@ -147,14 +148,20 @@ async fn select_scope(
     args: &LoginArgs,
     mut input: Option<Box<dyn BufRead>>,
 ) -> Result<()> {
-    let orgs = client.list_orgs().await.context("listing organizations")?;
+    let orgs = client.list_orgs().await.context("reading memberships")?;
     let org = pick("org", &orgs, args.org.as_deref(), &mut input)?;
-    auth.select(Some(org.slug.clone()), None).await;
+    auth.select_org(&org.slug).await;
 
     let vaults = client.list_vaults().await.context("listing vaults")?;
     let vault = pick("vault", &vaults, args.vault.as_deref(), &mut input)?;
-    auth.select(Some(org.slug.clone()), Some(vault.slug.clone()))
-        .await;
+    auth.select_vault(&vault.slug).await;
+
+    let environments = client
+        .list_environments(&vault.slug)
+        .await
+        .context("listing environments")?;
+    let environment = pick("env", &environments, args.env.as_deref(), &mut input)?;
+    auth.select_environment(&environment.slug).await;
     Ok(())
 }
 
@@ -212,5 +219,87 @@ mod tests {
     fn device_flag_selects_device_flow_with_or_without_a_terminal() {
         assert_eq!(choose_method(true, false, false), Method::Device);
         assert_eq!(choose_method(true, false, true), Method::Device);
+    }
+
+    mod scope {
+        use serde_json::json;
+
+        use super::super::*;
+        use crate::oauth::idp::IdpClient;
+        use crate::testing::{MockResponse, MockServer, http_client};
+
+        fn args(vault: Option<&str>) -> LoginArgs {
+            LoginArgs {
+                url: None,
+                device: false,
+                with_token: false,
+                idp_url: None,
+                org: None,
+                vault: vault.map(str::to_owned),
+                env: None,
+            }
+        }
+
+        async fn run_select(vault: Option<&str>) -> (Result<()>, Session, MockServer) {
+            let api = MockServer::start(|r| match r.path.as_str() {
+                "/me" => MockResponse::json(
+                    200,
+                    &json!({"user_id":"u","handle":"h","org_id":null,"org_role":null,
+                            "memberships":[{"org_id":"org-1","role":"owner"}]}),
+                ),
+                "/vaults" => MockResponse::json(
+                    200,
+                    &json!([{"slug":"a","name":"A"},{"slug":"b","name":"B"}]),
+                ),
+                "/vaults/b/environments" => {
+                    MockResponse::json(200, &json!([{"slug":"prod","name":"Prod"}]))
+                }
+                other => panic!("unexpected {other}"),
+            })
+            .await;
+            let idp = MockServer::start(|_| MockResponse::json(500, &json!({}))).await;
+            let session = Session {
+                idp_url: idp.url.to_string(),
+                access_token: Zeroizing::new("t".into()),
+                refresh_token: Zeroizing::new("r".into()),
+                expires_at: Utc::now() + chrono::Duration::seconds(900),
+                account: None,
+                org: None,
+                vault: None,
+                environment: None,
+            };
+            let auth = Arc::new(SessionAuth::new(
+                session,
+                IdpClient::with_http(idp.url.clone(), http_client()),
+                Arc::new(MemorySessionStore::default()),
+            ));
+            let client = ApiClient::with_http(
+                ApiConfig {
+                    base_url: api.url.clone(),
+                    auth: Auth::Session(auth.clone()),
+                },
+                http_client(),
+            );
+            let result = select_scope(&client, &auth, &args(vault), None).await;
+            (result, auth.snapshot().await, api)
+        }
+
+        #[tokio::test]
+        async fn single_org_and_environment_are_picked_and_the_vault_flag_is_honoured() {
+            let (result, session, api) = run_select(Some("b")).await;
+            result.unwrap();
+            assert_eq!(session.org.as_deref(), Some("org-1"));
+            assert_eq!(session.vault.as_deref(), Some("b"));
+            assert_eq!(session.environment.as_deref(), Some("prod"));
+            let vault_listing = &api.requests_to("/vaults")[0];
+            assert_eq!(vault_listing.header("x-ferrvault-org"), Some("org-1"));
+        }
+
+        #[tokio::test]
+        async fn several_vaults_without_a_flag_or_terminal_fail_before_saving_a_scope() {
+            let (result, session, _) = run_select(None).await;
+            assert!(result.unwrap_err().to_string().contains("--vault"));
+            assert!(session.vault.is_none() && session.environment.is_none());
+        }
     }
 }

@@ -20,6 +20,7 @@ pub struct Session {
     pub account: Option<String>,
     pub org: Option<String>,
     pub vault: Option<String>,
+    pub environment: Option<String>,
 }
 
 impl Session {
@@ -35,6 +36,7 @@ impl Session {
                 .and_then(|u| u.email.clone().or_else(|| u.name.clone())),
             org: None,
             vault: None,
+            environment: None,
         }
     }
 
@@ -54,6 +56,7 @@ pub struct SessionSummary {
     pub account: Option<String>,
     pub org: Option<String>,
     pub vault: Option<String>,
+    pub environment: Option<String>,
     pub expires_at: DateTime<Utc>,
 }
 
@@ -89,6 +92,11 @@ impl SessionStore for MemorySessionStore {
             .map_err(|_| anyhow!("session store poisoned"))? = Some(session.clone());
         Ok(())
     }
+}
+
+pub struct Scope {
+    pub vault: String,
+    pub environment: String,
 }
 
 pub struct Credential {
@@ -130,14 +138,38 @@ impl SessionAuth {
         self.refresh(&mut session).await
     }
 
-    pub async fn select(&self, org: Option<String>, vault: Option<String>) {
+    pub async fn select_org(&self, org: &str) {
         let mut session = self.state.lock().await;
-        session.org = org;
-        session.vault = vault;
+        session.org = Some(org.to_owned());
+        session.vault = None;
+        session.environment = None;
+    }
+
+    pub async fn select_vault(&self, vault: &str) {
+        let mut session = self.state.lock().await;
+        session.vault = Some(vault.to_owned());
+        session.environment = None;
+    }
+
+    pub async fn select_environment(&self, environment: &str) {
+        self.state.lock().await.environment = Some(environment.to_owned());
     }
 
     pub async fn vault(&self) -> Option<String> {
         self.state.lock().await.vault.clone()
+    }
+
+    pub async fn scope(&self) -> Result<Scope> {
+        let s = self.state.lock().await;
+        match (&s.vault, &s.environment) {
+            (Some(vault), Some(environment)) => Ok(Scope {
+                vault: vault.clone(),
+                environment: environment.clone(),
+            }),
+            _ => Err(anyhow!(
+                "no vault and environment selected; run `ferrvault login --vault <slug> --env <slug>`"
+            )),
+        }
     }
 
     pub async fn snapshot(&self) -> Session {
@@ -150,6 +182,7 @@ impl SessionAuth {
             account: s.account.clone(),
             org: s.org.clone(),
             vault: s.vault.clone(),
+            environment: s.environment.clone(),
             expires_at: s.expires_at,
         }
     }
@@ -188,6 +221,7 @@ mod tests {
             account: Some("a@b.c".into()),
             org: Some("acme".into()),
             vault: Some("prod".into()),
+            environment: Some("default".into()),
         }
     }
 
