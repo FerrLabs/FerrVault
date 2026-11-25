@@ -104,7 +104,7 @@ impl IdpClient {
     ) -> Result<TokenGrant, IdpError> {
         let (status, body) = self
             .post(
-                "/v1/auth/exchange",
+                "/auth/exchange",
                 &json!({
                     "code": code,
                     "client_id": CLIENT_ID,
@@ -119,7 +119,7 @@ impl IdpClient {
     pub async fn refresh(&self, refresh_token: &str) -> Result<TokenGrant, IdpError> {
         let (status, body) = self
             .post(
-                "/v1/auth/refresh",
+                "/auth/refresh",
                 &json!({ "client_id": CLIENT_ID, "refresh_token": refresh_token }),
             )
             .await?;
@@ -129,7 +129,7 @@ impl IdpClient {
     pub async fn logout(&self, access_token: &str) -> Result<(), IdpError> {
         let url = self
             .base
-            .join("/v1/auth/logout")
+            .join("/auth/logout")
             .map_err(|e| IdpError::Malformed(e.to_string()))?;
         let resp = self.http.post(url).bearer_auth(access_token).send().await?;
         let status = resp.status();
@@ -142,7 +142,7 @@ impl IdpClient {
 
     pub async fn start_device(&self) -> Result<DeviceAuthorization, IdpError> {
         let (status, body) = self
-            .post("/v1/auth/device/code", &json!({ "client_id": CLIENT_ID }))
+            .post("/auth/device/code", &json!({ "client_id": CLIENT_ID }))
             .await?;
         if !status.is_success() {
             return Err(classify_failure(status, &body));
@@ -153,7 +153,7 @@ impl IdpClient {
     pub async fn poll_device(&self, device_code: &str) -> Result<DevicePoll, IdpError> {
         let (status, body) = self
             .post(
-                "/v1/auth/device/token",
+                "/auth/device/token",
                 &json!({
                     "client_id": CLIENT_ID,
                     "grant_type": DEVICE_GRANT_TYPE,

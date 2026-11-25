@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex as StdMutex};
+use std::sync::{Arc, Condvar, Mutex as StdMutex};
 
 use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, Duration, Utc};
@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use zeroize::Zeroizing;
 
+use crate::lock::{ProcessLock, default_lock_path};
 use crate::oauth::idp::{IdpClient, IdpError, TokenGrant};
 use crate::storage::CredentialStore;
 
@@ -61,12 +62,22 @@ pub struct SessionSummary {
 }
 
 pub trait SessionStore: Send + Sync {
+    fn load(&self) -> Result<Option<Session>>;
     fn save(&self, session: &Session) -> Result<()>;
+    fn lock(&self) -> Result<Box<dyn Send>>;
 }
 
 pub struct KeyringSessionStore;
 
 impl SessionStore for KeyringSessionStore {
+    fn load(&self) -> Result<Option<Session>> {
+        CredentialStore::load_session()
+    }
+
+    fn lock(&self) -> Result<Box<dyn Send>> {
+        Ok(Box::new(ProcessLock::acquire(&default_lock_path()?)?))
+    }
+
     fn save(&self, session: &Session) -> Result<()> {
         CredentialStore::save_session(session)
     }
@@ -75,6 +86,24 @@ impl SessionStore for KeyringSessionStore {
 #[derive(Default)]
 pub struct MemorySessionStore {
     saved: StdMutex<Option<Session>>,
+    gate: Arc<Gate>,
+}
+
+#[derive(Default)]
+struct Gate {
+    held: StdMutex<bool>,
+    released: Condvar,
+}
+
+struct GateGuard(Arc<Gate>);
+
+impl Drop for GateGuard {
+    fn drop(&mut self) {
+        if let Ok(mut held) = self.0.held.lock() {
+            *held = false;
+        }
+        self.0.released.notify_one();
+    }
 }
 
 impl MemorySessionStore {
@@ -85,12 +114,37 @@ impl MemorySessionStore {
 }
 
 impl SessionStore for MemorySessionStore {
+    fn load(&self) -> Result<Option<Session>> {
+        Ok(self
+            .saved
+            .lock()
+            .map_err(|_| anyhow!("session store poisoned"))?
+            .clone())
+    }
+
     fn save(&self, session: &Session) -> Result<()> {
         *self
             .saved
             .lock()
             .map_err(|_| anyhow!("session store poisoned"))? = Some(session.clone());
         Ok(())
+    }
+
+    fn lock(&self) -> Result<Box<dyn Send>> {
+        let mut held = self
+            .gate
+            .held
+            .lock()
+            .map_err(|_| anyhow!("session gate poisoned"))?;
+        while *held {
+            held = self
+                .gate
+                .released
+                .wait(held)
+                .map_err(|_| anyhow!("session gate poisoned"))?;
+        }
+        *held = true;
+        Ok(Box::new(GateGuard(self.gate.clone())))
     }
 }
 
@@ -122,7 +176,8 @@ impl SessionAuth {
     pub async fn credential(&self) -> Result<Credential> {
         let mut session = self.state.lock().await;
         if session.needs_refresh(Utc::now()) {
-            self.refresh(&mut session).await?;
+            self.refresh(&mut session, |s| s.needs_refresh(Utc::now()))
+                .await?;
         }
         Ok(Credential {
             token: session.access_token.clone(),
@@ -135,7 +190,8 @@ impl SessionAuth {
         if session.access_token.as_str() != rejected_token {
             return Ok(());
         }
-        self.refresh(&mut session).await
+        self.refresh(&mut session, |s| s.access_token.as_str() == rejected_token)
+            .await
     }
 
     pub async fn select_org(&self, org: &str) {
@@ -193,7 +249,25 @@ impl SessionAuth {
         Ok(())
     }
 
-    async fn refresh(&self, session: &mut Session) -> Result<()> {
+    async fn refresh(
+        &self,
+        session: &mut Session,
+        still_stale: impl Fn(&Session) -> bool,
+    ) -> Result<()> {
+        let store = self.store.clone();
+        let _guard = tokio::task::spawn_blocking(move || store.lock())
+            .await
+            .context("waiting for the session lock")??;
+
+        if let Some(stored) = self.store.load()?
+            && stored.refresh_token.as_str() != session.refresh_token.as_str()
+        {
+            *session = stored;
+        }
+        if !still_stale(session) {
+            return Ok(());
+        }
+
         let grant = self
             .idp
             .refresh(&session.refresh_token)
@@ -233,7 +307,7 @@ mod tests {
 
     async fn idp_rotating() -> MockServer {
         MockServer::start(|r| {
-            assert_eq!(r.path, "/v1/auth/refresh");
+            assert_eq!(r.path, "/auth/refresh");
             MockResponse::json(
                 200,
                 &json!({"token":"new-access","refresh_token":"new-refresh","expires_in":900}),
@@ -316,10 +390,69 @@ mod tests {
         assert!(!err.contains("expired or revoked"));
     }
 
+    async fn single_use_idp() -> MockServer {
+        let used = Arc::new(StdMutex::new(Vec::<String>::new()));
+        MockServer::start(move |r| {
+            let presented = r.json()["refresh_token"].as_str().unwrap().to_owned();
+            let mut used = used.lock().unwrap();
+            if used.contains(&presented) {
+                return MockResponse::json(400, &json!({"error":"invalid_grant"}));
+            }
+            used.push(presented);
+            MockResponse::json(
+                200,
+                &json!({"token":"new-access","refresh_token":"new-refresh","expires_in":3600}),
+            )
+        })
+        .await
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn two_processes_refreshing_the_same_session_rotate_it_once() {
+        let idp = single_use_idp().await;
+        let store = Arc::new(MemorySessionStore::default());
+        let first = auth_for(&idp, session(-5), store.clone());
+        let second = auth_for(&idp, session(-5), store.clone());
+        let (a, b) = tokio::join!(first.credential(), second.credential());
+        assert_eq!(a.unwrap().token.as_str(), "new-access");
+        assert_eq!(b.unwrap().token.as_str(), "new-access");
+        assert_eq!(idp.requests().len(), 1);
+        assert_eq!(store.saved().unwrap().refresh_token.as_str(), "new-refresh");
+    }
+
+    #[tokio::test]
+    async fn a_401_after_another_process_rotated_adopts_the_stored_pair() {
+        let idp = single_use_idp().await;
+        let store = Arc::new(MemorySessionStore::default());
+        let mut rotated = session(3600);
+        rotated.access_token = Zeroizing::new("new-access".into());
+        rotated.refresh_token = Zeroizing::new("new-refresh".into());
+        store.save(&rotated).unwrap();
+        let auth = auth_for(&idp, session(3600), store);
+        auth.refresh_after_rejection("old-access").await.unwrap();
+        assert_eq!(
+            auth.credential().await.unwrap().token.as_str(),
+            "new-access"
+        );
+        assert!(idp.requests().is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_stored_pair_that_is_itself_expired_is_refreshed_with_its_own_token() {
+        let idp = single_use_idp().await;
+        let store = Arc::new(MemorySessionStore::default());
+        let mut stored = session(-5);
+        stored.refresh_token = Zeroizing::new("stored-refresh".into());
+        store.save(&stored).unwrap();
+        let auth = auth_for(&idp, session(-5), store);
+        auth.credential().await.unwrap();
+        assert_eq!(idp.requests()[0].json()["refresh_token"], "stored-refresh");
+    }
+
     #[tokio::test]
     async fn sign_out_sends_the_access_token_as_bearer_and_never_the_refresh_token() {
         let idp = MockServer::start(|r| {
-            assert_eq!(r.path, "/v1/auth/logout");
+            assert_eq!(r.path, "/auth/logout");
             MockResponse {
                 status: 204,
                 body: String::new(),
@@ -337,7 +470,7 @@ mod tests {
     #[tokio::test]
     async fn sign_out_with_an_expired_access_token_refreshes_first() {
         let idp = MockServer::start(|r| {
-            if r.path == "/v1/auth/refresh" {
+            if r.path == "/auth/refresh" {
                 MockResponse::json(
                     200,
                     &json!({"token":"new-access","refresh_token":"new-refresh","expires_in":900}),
@@ -352,7 +485,7 @@ mod tests {
         .await;
         let auth = auth_for(&idp, session(-5), Arc::new(MemorySessionStore::default()));
         auth.sign_out().await.unwrap();
-        let logout = idp.requests_to("/v1/auth/logout");
+        let logout = idp.requests_to("/auth/logout");
         assert_eq!(logout[0].header("authorization"), Some("Bearer new-access"));
     }
 

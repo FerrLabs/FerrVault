@@ -61,7 +61,7 @@ mod tests {
     ) -> (MockServer, IdpClient) {
         let polls = Arc::new(Mutex::new(polls.into_iter()));
         let server = MockServer::start(move |r| match r.path.as_str() {
-            "/v1/auth/device/code" => MockResponse::json(
+            "/auth/device/code" => MockResponse::json(
                 200,
                 &json!({
                     "device_code": "dev-123",
@@ -72,7 +72,7 @@ mod tests {
                     "interval": interval,
                 }),
             ),
-            "/v1/auth/device/token" => {
+            "/auth/device/token" => {
                 let next = polls.lock().unwrap().next();
                 let (status, body) = next.unwrap_or((400, error("authorization_pending")));
                 MockResponse::json(status, &body)
@@ -119,7 +119,7 @@ mod tests {
         let (result, sleeps) = drive(&client).await;
         assert_eq!(result.unwrap().token, "access-d");
         assert_eq!(sleeps, secs(&[2, 2, 2]));
-        let polls = server.requests_to("/v1/auth/device/token");
+        let polls = server.requests_to("/auth/device/token");
         assert_eq!(polls.len(), 3);
         let body = polls[0].json();
         assert_eq!(body["device_code"], "dev-123");
@@ -153,7 +153,7 @@ mod tests {
         let (server, client) = idp(600, 1, vec![(400, error("expired_token"))]).await;
         let (result, _) = drive(&client).await;
         assert!(result.err().unwrap().to_string().contains("expired"));
-        assert_eq!(server.requests_to("/v1/auth/device/token").len(), 1);
+        assert_eq!(server.requests_to("/auth/device/token").len(), 1);
     }
 
     #[tokio::test]
@@ -162,7 +162,7 @@ mod tests {
         let (result, sleeps) = drive(&client).await;
         assert!(result.err().unwrap().to_string().contains("expired"));
         assert_eq!(sleeps, secs(&[2, 2]));
-        assert_eq!(server.requests_to("/v1/auth/device/token").len(), 2);
+        assert_eq!(server.requests_to("/auth/device/token").len(), 2);
     }
 
     #[tokio::test]
@@ -170,7 +170,7 @@ mod tests {
         let (server, client) = idp(600, 1, vec![(400, error("access_denied"))]).await;
         let (result, _) = drive(&client).await;
         assert!(result.err().unwrap().to_string().contains("denied"));
-        assert_eq!(server.requests_to("/v1/auth/device/token").len(), 1);
+        assert_eq!(server.requests_to("/auth/device/token").len(), 1);
     }
 
     #[tokio::test]
@@ -178,7 +178,7 @@ mod tests {
         let (server, client) = idp(600, 1, vec![(400, error("invalid_client"))]).await;
         let (result, _) = drive(&client).await;
         assert!(format!("{:#}", result.err().unwrap()).contains("invalid_client"));
-        assert_eq!(server.requests_to("/v1/auth/device/token").len(), 1);
+        assert_eq!(server.requests_to("/auth/device/token").len(), 1);
     }
 
     #[tokio::test]

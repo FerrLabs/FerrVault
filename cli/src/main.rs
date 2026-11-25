@@ -4,6 +4,7 @@ use clap::Parser;
 mod api;
 mod cli;
 mod commands;
+mod lock;
 mod oauth;
 mod session;
 mod storage;

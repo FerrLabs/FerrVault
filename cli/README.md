@@ -40,7 +40,7 @@ token prompt on a terminal.
 A `fvsat_` token is validated against `/v1/operator/me` before anything is
 stored. An OAuth login stores an access token and a refresh token; the access
 token is refreshed transparently when it expires or the API answers 401, and
-the rotated pair is written back to the keyring. If the refresh token is
+the rotated pair is written back to the keyring. Refreshes are serialized across CLI processes with a lock file under your state directory (it holds no data), because the identity provider ends the session if a rotated refresh token is reused. If the refresh token is
 revoked or expired, run `ferrvault login` again. `FERRVAULT_TOKEN` and
 `--token` always win over a stored session.
 

@@ -29,7 +29,6 @@ pub fn authorize_url(base: &Url, redirect_uri: &str, challenge: &str, state: &st
         .join(AUTHORIZE_PATH)
         .context("building authorize URL")?;
     url.query_pairs_mut()
-        .append_pair("response_type", "code")
         .append_pair("client_id", CLIENT_ID)
         .append_pair("redirect_uri", redirect_uri)
         .append_pair("code_challenge", challenge)
@@ -70,7 +69,7 @@ mod tests {
 
     async fn idp_granting() -> MockServer {
         MockServer::start(|r| {
-            assert_eq!(r.path, "/v1/auth/exchange");
+            assert_eq!(r.path, "/auth/exchange");
             MockResponse::json(
                 200,
                 &json!({
@@ -116,10 +115,9 @@ mod tests {
         assert_eq!(url.path(), "/authorize");
         assert_eq!(query(&url, "client_id"), "ferrvault-cli");
         assert_eq!(query(&url, "code_challenge_method"), "S256");
-        assert_eq!(query(&url, "response_type"), "code");
         assert!(query(&url, "redirect_uri").starts_with("http://127.0.0.1:"));
 
-        let sent = idp.requests_to("/v1/auth/exchange");
+        let sent = idp.requests_to("/auth/exchange");
         assert_eq!(sent.len(), 1);
         let body = sent[0].json();
         assert_eq!(body["code"], "the-code");
