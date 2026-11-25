@@ -56,7 +56,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: Install Linux deps for keyring (native builds only — cross uses Cross.toml)
+      - name: Install Linux deps for keyring (native builds only, cross uses Cross.toml)
         if: runner.os == 'Linux' && matrix.tool == 'cargo'
         run: |
           sudo apt-get update
