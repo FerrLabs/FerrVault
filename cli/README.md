@@ -60,7 +60,7 @@ The identity provider defaults to `https://auth.ferrlabs.com`
 | Command                       | What it does                                                |
 | ----------------------------- | ----------------------------------------------------------- |
 | `ferrvault login`             | Log in (browser, `--device`, or SAT) and store the credentials in the OS keyring. |
-| `ferrvault logout`            | Revoke the OAuth session where possible, then forget url + credentials. |
+| `ferrvault logout`            | End the OAuth session at the identity provider where possible, then forget url + credentials. |
 | `ferrvault whoami [--json]`   | Show the bound vault, role, label, and expiry (SAT) or user, org and role, vault, environment and access token expiry (OAuth). |
 | `ferrvault list [--json]`     | List secret names + current version (no values).            |
 | `ferrvault get NAME`          | Print a single secret value to stdout.                      |
@@ -119,7 +119,7 @@ via `FERRVAULT_TOKEN` instead of using `login`.
 
 An OAuth session is a user-wide credential (every org and vault the account
 can reach), unlike a SAT, which is bound to one vault. The CLI never prints
-it; `logout` revokes the refresh token.
+it; `logout` ends the session at the identity provider, which revokes the refresh token.
 
 ## Threat model
 

@@ -34,6 +34,7 @@ pub struct IdpUser {
 pub struct TokenGrant {
     pub token: String,
     pub refresh_token: String,
+    #[serde(default = "default_access_ttl")]
     pub expires_in: i64,
     #[serde(default)]
     #[zeroize(skip)]
@@ -54,6 +55,10 @@ pub struct DeviceAuthorization {
 
 fn default_interval() -> u64 {
     5
+}
+
+fn default_access_ttl() -> i64 {
+    300
 }
 
 pub enum DevicePoll {
@@ -121,16 +126,17 @@ impl IdpClient {
         parse_grant(status, &body)
     }
 
-    pub async fn revoke(&self, refresh_token: &str) -> Result<(), IdpError> {
-        let (status, body) = self
-            .post(
-                "/v1/auth/revoke",
-                &json!({ "client_id": CLIENT_ID, "refresh_token": refresh_token }),
-            )
-            .await?;
+    pub async fn logout(&self, access_token: &str) -> Result<(), IdpError> {
+        let url = self
+            .base
+            .join("/v1/auth/logout")
+            .map_err(|e| IdpError::Malformed(e.to_string()))?;
+        let resp = self.http.post(url).bearer_auth(access_token).send().await?;
+        let status = resp.status();
         if status.is_success() {
             return Ok(());
         }
+        let body = resp.text().await?;
         Err(classify_failure(status, &body))
     }
 

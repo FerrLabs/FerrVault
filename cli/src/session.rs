@@ -187,6 +187,12 @@ impl SessionAuth {
         }
     }
 
+    pub async fn sign_out(&self) -> Result<()> {
+        let credential = self.credential().await?;
+        self.idp.logout(&credential.token).await?;
+        Ok(())
+    }
+
     async fn refresh(&self, session: &mut Session) -> Result<()> {
         let grant = self
             .idp
@@ -308,6 +314,54 @@ mod tests {
         let err = format!("{:#}", auth.credential().await.err().unwrap());
         assert!(err.contains("unavailable"), "{err}");
         assert!(!err.contains("expired or revoked"));
+    }
+
+    #[tokio::test]
+    async fn sign_out_sends_the_access_token_as_bearer_and_never_the_refresh_token() {
+        let idp = MockServer::start(|r| {
+            assert_eq!(r.path, "/v1/auth/logout");
+            MockResponse {
+                status: 204,
+                body: String::new(),
+            }
+        })
+        .await;
+        let auth = auth_for(&idp, session(900), Arc::new(MemorySessionStore::default()));
+        auth.sign_out().await.unwrap();
+        let sent = idp.requests();
+        assert_eq!(sent.len(), 1);
+        assert_eq!(sent[0].header("authorization"), Some("Bearer old-access"));
+        assert!(!sent[0].body.contains("old-refresh"));
+    }
+
+    #[tokio::test]
+    async fn sign_out_with_an_expired_access_token_refreshes_first() {
+        let idp = MockServer::start(|r| {
+            if r.path == "/v1/auth/refresh" {
+                MockResponse::json(
+                    200,
+                    &json!({"token":"new-access","refresh_token":"new-refresh","expires_in":900}),
+                )
+            } else {
+                MockResponse {
+                    status: 204,
+                    body: String::new(),
+                }
+            }
+        })
+        .await;
+        let auth = auth_for(&idp, session(-5), Arc::new(MemorySessionStore::default()));
+        auth.sign_out().await.unwrap();
+        let logout = idp.requests_to("/v1/auth/logout");
+        assert_eq!(logout[0].header("authorization"), Some("Bearer new-access"));
+    }
+
+    #[tokio::test]
+    async fn sign_out_failure_is_reported() {
+        let idp =
+            MockServer::start(|_| MockResponse::json(401, &json!({"error":"unauthorized"}))).await;
+        let auth = auth_for(&idp, session(900), Arc::new(MemorySessionStore::default()));
+        assert!(auth.sign_out().await.is_err());
     }
 
     #[test]

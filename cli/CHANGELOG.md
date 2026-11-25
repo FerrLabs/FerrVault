@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Features
 
-- feat(cli): OAuth login through auth.ferrlabs.com (browser with loopback PKCE, `--device` flow), transparent token refresh, org and vault selection, remote revocation on `logout`
+- feat(cli): OAuth login through auth.ferrlabs.com (browser with loopback PKCE, `--device` flow), transparent token refresh, org and vault selection, remote session end on `logout`
 
 ### Bug Fixes
 
