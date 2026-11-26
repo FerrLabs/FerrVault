@@ -7,6 +7,7 @@ use reqwest::Url;
 use zeroize::Zeroizing;
 
 use super::connection::{idp_tls_options, require_https, tls_args};
+use super::logout::end_stored_session;
 use super::select::pick;
 use crate::api::{ApiClient, ApiConfig, Auth, TlsArgs};
 use crate::cli::{Cli, LoginArgs};
@@ -85,6 +86,7 @@ async fn sat_login(url: Url, cli: &Cli, tls: TlsArgs<'_>) -> Result<()> {
         .await
         .context("validating token against /operator/me")?;
 
+    end_stored_session(&tls).await;
     CredentialStore::save_url(url.as_str())?;
     CredentialStore::save_token(&token)?;
     CredentialStore::delete_session()?;
@@ -106,7 +108,8 @@ async fn oauth_login(url: Url, args: &LoginArgs, tls: TlsArgs<'_>, device: bool)
     } else {
         browser_login(&idp, open_in_browser).await?
     };
-    let session = Session::from_grant(idp_url.as_str(), &grant, Utc::now());
+    let session = Session::from_grant(idp_url.as_str(), &grant, Utc::now())
+        .context("reading the login response")?;
     drop(grant);
 
     let scratch: Arc<dyn SessionStore> = Arc::new(MemorySessionStore::default());
@@ -128,6 +131,7 @@ async fn oauth_login(url: Url, args: &LoginArgs, tls: TlsArgs<'_>, device: bool)
 
     let session = auth.snapshot().await;
     CredentialStore::save_url(url.as_str())?;
+    end_stored_session(&tls).await;
     KeyringSessionStore.save(&session)?;
     CredentialStore::delete_token()?;
 

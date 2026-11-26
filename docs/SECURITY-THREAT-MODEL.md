@@ -74,7 +74,10 @@ Boundary (b): the network between the CLI and the FerrVault API.
 | Revoked or expired session keeps being retried | A rejected refresh surfaces as "run `ferrvault login` again"; a 401 triggers at most one refresh and one replay per request. | ✅ |
 | Blast radius of a stolen session larger than a SAT | A session is user-wide, so prefer a SAT for CI and unattended jobs (least privilege: one vault, one role). Org, vault and environment are pinned at login and the org is sent as `x-ferrvault-org`; server-side authorization (org membership, vault roles) still decides every request. | ⚠ accepted, by design |
 | Vault TLS pin or client cert applied to the wrong host | The IdP client gets `--ca-cert` and the insecure gate only; `--pin-sha256` and mTLS apply to the FerrVault API alone. Both URLs must be `https://`. | ✅ |
-| Tokens in logs, output or history | Never printed; held in `Zeroizing` buffers without `Debug` impls; the session JSON is only ever written to the keyring. | ✅ |
+| Secret names, vault or environment slugs redirect a request to another route (`..`, `/`, `?`, `#`) | Every URL path is built segment by segment with percent-encoding, and `.`, `..` and empty segments are refused before any request is sent. | ✅ |
+| Previous session left valid after a new login | A new OAuth login or a SAT login ends the stored session at the IdP first (best effort, a failure only warns). | ✅ |
+| Local process ends a pending browser login with a forged callback | A callback with a wrong or missing `state` gets a 400 and the listener keeps waiting until its timeout. | ✅ |
+| Tokens in logs, output or history | Never printed; held in `Zeroizing` buffers without `Debug` impls; the tokens are only ever written to the keyring, as separate entries from the session metadata. | ✅ |
 | TLS flags ignored on `login` | `login` and `logout` build their HTTP clients from the same TLS arguments as every other command (fixes #318). | ✅ |
 
 ### T3 — leak of decrypted values

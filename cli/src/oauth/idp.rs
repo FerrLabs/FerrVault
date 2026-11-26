@@ -1,4 +1,5 @@
 use anyhow::Result;
+use chrono::{DateTime, TimeDelta, Utc};
 use reqwest::{Client, StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -39,6 +40,17 @@ pub struct TokenGrant {
     #[serde(default)]
     #[zeroize(skip)]
     pub user: Option<IdpUser>,
+}
+
+impl TokenGrant {
+    pub fn expires_at(&self, now: DateTime<Utc>) -> Result<DateTime<Utc>, IdpError> {
+        let malformed = || IdpError::Malformed(format!("invalid expires_in {}", self.expires_in));
+        if self.expires_in < 0 {
+            return Err(malformed());
+        }
+        let lifetime = TimeDelta::try_seconds(self.expires_in).ok_or_else(malformed)?;
+        now.checked_add_signed(lifetime).ok_or_else(malformed)
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]

@@ -90,11 +90,12 @@ mod tests {
             .unwrap()
     }
 
-    fn call_back(url: &Url, override_state: Option<&str>) {
+    fn call_back(url: &Url, code: &str, override_state: Option<&str>) {
         let redirect = query(url, "redirect_uri");
         let state = override_state.map_or_else(|| query(url, "state"), str::to_owned);
+        let code = code.to_owned();
         tokio::spawn(async move {
-            let _ = reqwest::get(format!("{redirect}?code=the-code&state={state}")).await;
+            let _ = reqwest::get(format!("{redirect}?code={code}&state={state}")).await;
         });
     }
 
@@ -104,7 +105,7 @@ mod tests {
         let mut seen = None;
         let grant = browser_login(&idp_for(&idp), |url| {
             seen = Some(url.clone());
-            call_back(url, None);
+            call_back(url, "the-code", None);
         })
         .await
         .unwrap();
@@ -130,14 +131,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn state_mismatch_never_reaches_the_exchange() {
+    async fn a_forged_callback_never_reaches_the_exchange() {
         let idp = idp_granting().await;
-        let result = browser_login(&idp_for(&idp), |url| {
-            call_back(url, Some("attacker-state"));
+        browser_login(&idp_for(&idp), |url| {
+            call_back(url, "attacker-code", Some("attacker-state"));
+            call_back(url, "the-code", None);
         })
-        .await;
-        assert!(result.is_err());
-        assert!(idp.requests().is_empty());
+        .await
+        .unwrap();
+        let sent = idp.requests_to("/auth/exchange");
+        assert_eq!(sent.len(), 1);
+        assert_eq!(sent[0].json()["code"], "the-code");
     }
 
     #[tokio::test]
@@ -147,7 +151,7 @@ mod tests {
         let err = format!(
             "{:#}",
             browser_login(&idp_for(&idp), |url| {
-                call_back(url, None);
+                call_back(url, "the-code", None);
             })
             .await
             .err()

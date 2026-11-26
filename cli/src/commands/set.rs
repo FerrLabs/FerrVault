@@ -15,6 +15,7 @@ pub async fn run(
     update: bool,
 ) -> Result<()> {
     let vault = client.vault_slug().await?;
+    let scope = client.describe_scope(&vault).await;
 
     let plaintext: Zeroizing<String> = match (value, stdin, from_file) {
         (Some(v), false, None) => Zeroizing::new(v),
@@ -65,9 +66,8 @@ pub async fn run(
         }
     })?;
     eprintln!(
-        "ferrvault: {} `{name}` in vault `{}`.",
-        if update { "rotated" } else { "created" },
-        vault
+        "ferrvault: {} `{name}` in {scope}.",
+        if update { "rotated" } else { "created" }
     );
     Ok(())
 }

@@ -37,6 +37,9 @@ stdin means a `fvsat_` token; `--device` means the device flow; an interactive
 terminal with no token opens the browser. `--with-token` forces the masked
 token prompt on a terminal.
 
+Logging in again, or switching to a SAT, ends the previous OAuth session at the
+identity provider first (a failure only warns).
+
 A `fvsat_` token is validated against `/v1/operator/me` before anything is
 stored. An OAuth login stores an access token and a refresh token; the access
 token is refreshed transparently when it expires or the API answers 401, and
@@ -104,8 +107,9 @@ ferrvault exec --names DATABASE_URL,STRIPE_KEY -- npm run start
 
 ## Storage
 
-The credentials (a SAT, or an OAuth session holding the access and refresh
-tokens plus the selected org and vault) are stored in the OS-native credential
+The credentials (a SAT, or an OAuth session: the access token, the refresh token and a small
+metadata entry with the selected org, vault and environment, kept as separate
+keyring entries to stay under per-entry size limits) are stored in the OS-native credential
 store:
 
 - Windows → DPAPI / Credential Manager

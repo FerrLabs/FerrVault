@@ -49,7 +49,10 @@ impl CallbackServer {
                 continue;
             }
             match interpret(&url, expected_state) {
-                Ok(code) => {
+                Callback::WrongState => {
+                    respond(&mut stream, 400, "This login attempt does not match.").await;
+                }
+                Callback::Code(code) => {
                     respond(
                         &mut stream,
                         200,
@@ -58,7 +61,7 @@ impl CallbackServer {
                     .await;
                     return Ok(code);
                 }
-                Err(e) => {
+                Callback::Failed(e) => {
                     respond(&mut stream, 400, "Login failed. Return to the terminal.").await;
                     return Err(e);
                 }
@@ -67,7 +70,13 @@ impl CallbackServer {
     }
 }
 
-fn interpret(url: &Url, expected_state: &str) -> Result<String> {
+enum Callback {
+    WrongState,
+    Code(String),
+    Failed(anyhow::Error),
+}
+
+fn interpret(url: &Url, expected_state: &str) -> Callback {
     let mut state = None;
     let mut code = None;
     let mut error = None;
@@ -80,15 +89,15 @@ fn interpret(url: &Url, expected_state: &str) -> Result<String> {
         }
     }
     if state.as_deref() != Some(expected_state) {
-        return Err(anyhow!(
-            "callback state does not match this login attempt; aborting"
-        ));
+        return Callback::WrongState;
     }
     if let Some(e) = error {
-        return Err(anyhow!("login was not completed: {e}"));
+        return Callback::Failed(anyhow!("login was not completed: {e}"));
     }
-    code.filter(|c| !c.is_empty())
-        .ok_or_else(|| anyhow!("callback did not carry an authorization code"))
+    match code.filter(|c| !c.is_empty()) {
+        Some(c) => Callback::Code(c),
+        None => Callback::Failed(anyhow!("callback did not carry an authorization code")),
+    }
 }
 
 async fn read_request_target(stream: &mut TcpStream) -> Result<Option<String>> {
@@ -153,23 +162,26 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn aborts_on_state_mismatch_without_yielding_the_code() {
+    async fn wrong_state_is_refused_and_the_wait_continues() {
         let server = CallbackServer::bind().await.unwrap();
         let redirect = server.redirect_uri();
         let waiter = tokio::spawn(server.wait_for_code("good", Duration::from_secs(5)));
         assert_eq!(get(format!("{redirect}?code=stolen&state=evil")).await, 400);
-        let err = waiter.await.unwrap().unwrap_err().to_string();
-        assert!(err.contains("state"), "{err}");
-        assert!(!err.contains("stolen"));
+        assert_eq!(get(format!("{redirect}?code=abc")).await, 400);
+        assert!(!waiter.is_finished());
+        get(format!("{redirect}?code=abc&state=good")).await;
+        assert_eq!(waiter.await.unwrap().unwrap(), "abc");
     }
 
     #[tokio::test]
-    async fn missing_state_is_a_mismatch() {
+    async fn only_wrong_state_requests_end_in_a_timeout() {
         let server = CallbackServer::bind().await.unwrap();
         let redirect = server.redirect_uri();
-        let waiter = tokio::spawn(server.wait_for_code("good", Duration::from_secs(5)));
-        get(format!("{redirect}?code=abc")).await;
-        assert!(waiter.await.unwrap().is_err());
+        let waiter = tokio::spawn(server.wait_for_code("good", Duration::from_millis(300)));
+        get(format!("{redirect}?code=stolen&state=evil")).await;
+        let err = waiter.await.unwrap().unwrap_err().to_string();
+        assert!(err.contains("timed out"), "{err}");
+        assert!(!err.contains("stolen"));
     }
 
     #[tokio::test]

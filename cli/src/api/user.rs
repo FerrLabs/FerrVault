@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use super::{ApiClient, BulkReadHit, BulkReadResponse, Choice, InventoryItem, handle};
 use crate::session::{Scope, SessionAuth};
 
-const REVEAL_BATCH: usize = 500;
+const REVEAL_BATCH: usize = 100;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Membership {
@@ -22,16 +22,36 @@ pub struct UserMe {
     pub memberships: Vec<Membership>,
 }
 
-fn secrets_path(scope: &Scope) -> String {
-    format!(
-        "/vaults/{}/environments/{}/secrets",
-        scope.vault, scope.environment
-    )
+#[derive(Serialize)]
+struct NamesBody<'a> {
+    names: &'a [String],
+}
+
+#[derive(Serialize)]
+struct CreateBody<'a> {
+    name: &'a str,
+    value: &'a str,
+}
+
+#[derive(Serialize)]
+struct UpdateBody<'a> {
+    value: &'a str,
+}
+
+fn secrets_route<'a>(scope: &'a Scope, tail: &[&'a str]) -> Vec<&'a str> {
+    let mut route = vec![
+        "vaults",
+        scope.vault.as_str(),
+        "environments",
+        scope.environment.as_str(),
+    ];
+    route.extend_from_slice(tail);
+    route
 }
 
 impl ApiClient {
     pub async fn user_me(&self) -> Result<UserMe> {
-        self.get_json("/me").await
+        self.get_json(&["me"]).await
     }
 
     pub async fn list_orgs(&self) -> Result<Vec<Choice>> {
@@ -47,17 +67,16 @@ impl ApiClient {
     }
 
     pub async fn list_vaults(&self) -> Result<Vec<Choice>> {
-        self.get_json("/vaults").await
+        self.get_json(&["vaults"]).await
     }
 
     pub async fn list_environments(&self, vault: &str) -> Result<Vec<Choice>> {
-        self.get_json(&format!("/vaults/{vault}/environments"))
-            .await
+        self.get_json(&["vaults", vault, "environments"]).await
     }
 
     pub(super) async fn user_inventory(&self, session: &SessionAuth) -> Result<Vec<InventoryItem>> {
         let scope = session.scope().await?;
-        self.get_json(&secrets_path(&scope)).await
+        self.get_json(&secrets_route(&scope, &["secrets"])).await
     }
 
     pub(super) async fn user_reveal(
@@ -69,22 +88,17 @@ impl ApiClient {
         let wanted: Vec<String> = match names {
             Some(n) => n.to_vec(),
             None => self
-                .get_json::<Vec<InventoryItem>>(&secrets_path(&scope))
+                .get_json::<Vec<InventoryItem>>(&secrets_route(&scope, &["secrets"]))
                 .await?
                 .into_iter()
                 .map(|i| i.name)
                 .collect(),
         };
-        let path = format!("{}:reveal", secrets_path(&scope));
+        let route = secrets_route(&scope, &["secrets:reveal"]);
         let mut hits: Vec<BulkReadHit> = Vec::with_capacity(wanted.len());
         for chunk in wanted.chunks(REVEAL_BATCH) {
             let resp = self
-                .send(
-                    Method::POST,
-                    &path,
-                    &[],
-                    Some(serde_json::json!({ "names": chunk })),
-                )
+                .send(Method::POST, &route, &[], Some(&NamesBody { names: chunk }))
                 .await?;
             hits.extend(handle::<Vec<BulkReadHit>>(resp).await?);
         }
@@ -101,9 +115,13 @@ impl ApiClient {
         value: &str,
     ) -> Result<serde_json::Value> {
         let scope = session.scope().await?;
-        let body = serde_json::json!({ "name": name, "value": value });
         let resp = self
-            .send(Method::POST, &secrets_path(&scope), &[], Some(body))
+            .send(
+                Method::POST,
+                &secrets_route(&scope, &["secrets"]),
+                &[],
+                Some(&CreateBody { name, value }),
+            )
             .await?;
         handle(resp).await
     }
@@ -115,13 +133,12 @@ impl ApiClient {
         value: &str,
     ) -> Result<serde_json::Value> {
         let scope = session.scope().await?;
-        let body = serde_json::json!({ "value": value });
         let resp = self
             .send(
                 Method::PUT,
-                &format!("{}/{name}", secrets_path(&scope)),
+                &secrets_route(&scope, &["secrets", name]),
                 &[],
-                Some(body),
+                Some(&UpdateBody { value }),
             )
             .await?;
         handle(resp).await
@@ -132,9 +149,9 @@ impl ApiClient {
         let resp = self
             .send(
                 Method::DELETE,
-                &format!("{}/{name}", secrets_path(&scope)),
+                &secrets_route(&scope, &["secrets", name]),
                 &[],
-                None,
+                None::<&()>,
             )
             .await?;
         if resp.status().is_success() {

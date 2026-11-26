@@ -6,6 +6,7 @@ use crate::api::ApiClient;
 
 pub async fn run(client: &ApiClient, name: String, yes: bool) -> Result<()> {
     let vault = client.vault_slug().await?;
+    let scope = client.describe_scope(&vault).await;
 
     if !yes {
         let stdin = std::io::stdin();
@@ -15,7 +16,7 @@ pub async fn run(client: &ApiClient, name: String, yes: bool) -> Result<()> {
             ));
         }
         eprint!(
-            "ferrvault: DELETE `{name}` from vault `{vault}` — this is a soft-delete (versions are kept). Type the secret name to confirm: "
+            "ferrvault: DELETE `{name}` from {scope} — this is a soft-delete (versions are kept). Type the secret name to confirm: "
         );
         std::io::stderr().flush().ok();
         let mut line = String::new();
@@ -32,6 +33,6 @@ pub async fn run(client: &ApiClient, name: String, yes: bool) -> Result<()> {
         .delete_secret(&vault, &name)
         .await
         .with_context(|| format!("deleting `{name}`"))?;
-    eprintln!("ferrvault: deleted `{name}` from vault `{vault}`.");
+    eprintln!("ferrvault: deleted `{name}` from {scope}.");
     Ok(())
 }
