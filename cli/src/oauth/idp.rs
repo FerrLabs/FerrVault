@@ -116,7 +116,7 @@ impl IdpClient {
     ) -> Result<TokenGrant, IdpError> {
         let (status, body) = self
             .post(
-                "/auth/exchange",
+                &["auth", "exchange"],
                 &json!({
                     "code": code,
                     "client_id": CLIENT_ID,
@@ -131,7 +131,7 @@ impl IdpClient {
     pub async fn refresh(&self, refresh_token: &str) -> Result<TokenGrant, IdpError> {
         let (status, body) = self
             .post(
-                "/auth/refresh",
+                &["auth", "refresh"],
                 &json!({ "client_id": CLIENT_ID, "refresh_token": refresh_token }),
             )
             .await?;
@@ -139,10 +139,7 @@ impl IdpClient {
     }
 
     pub async fn logout(&self, access_token: &str) -> Result<(), IdpError> {
-        let url = self
-            .base
-            .join("/auth/logout")
-            .map_err(|e| IdpError::Malformed(e.to_string()))?;
+        let url = endpoint(&self.base, &["auth", "logout"])?;
         let resp = self.http.post(url).bearer_auth(access_token).send().await?;
         let status = resp.status();
         if status.is_success() {
@@ -154,7 +151,10 @@ impl IdpClient {
 
     pub async fn start_device(&self) -> Result<DeviceAuthorization, IdpError> {
         let (status, body) = self
-            .post("/auth/device/code", &json!({ "client_id": CLIENT_ID }))
+            .post(
+                &["auth", "device", "code"],
+                &json!({ "client_id": CLIENT_ID }),
+            )
             .await?;
         if !status.is_success() {
             return Err(classify_failure(status, &body));
@@ -165,7 +165,7 @@ impl IdpClient {
     pub async fn poll_device(&self, device_code: &str) -> Result<DevicePoll, IdpError> {
         let (status, body) = self
             .post(
-                "/auth/device/token",
+                &["auth", "device", "token"],
                 &json!({
                     "client_id": CLIENT_ID,
                     "grant_type": DEVICE_GRANT_TYPE,
@@ -187,18 +187,24 @@ impl IdpClient {
 
     async fn post(
         &self,
-        path: &str,
+        route: &[&str],
         body: &serde_json::Value,
     ) -> Result<(StatusCode, String), IdpError> {
-        let url = self
-            .base
-            .join(path)
-            .map_err(|e| IdpError::Malformed(e.to_string()))?;
+        let url = endpoint(&self.base, route)?;
         let resp = self.http.post(url).json(body).send().await?;
         let status = resp.status();
         let text = resp.text().await?;
         Ok((status, text))
     }
+}
+
+pub fn endpoint(base: &Url, route: &[&str]) -> Result<Url, IdpError> {
+    let mut url = base.clone();
+    url.path_segments_mut()
+        .map_err(|()| IdpError::Malformed("identity provider URL cannot carry a path".into()))?
+        .pop_if_empty()
+        .extend(route);
+    Ok(url)
 }
 
 fn device_error(code: &str, status: StatusCode) -> Result<DevicePoll, IdpError> {

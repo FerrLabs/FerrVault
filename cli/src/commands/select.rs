@@ -30,10 +30,12 @@ pub fn pick<'a>(
     };
     eprintln!("ferrvault: select a {kind}:");
     for (i, c) in items.iter().enumerate() {
-        match &c.name {
-            Some(n) => eprintln!("  {}) {} ({n})", i + 1, c.slug),
-            None => eprintln!("  {}) {}", i + 1, c.slug),
-        }
+        let label = c.name.as_ref().map_or(String::new(), |n| format!(" ({n})"));
+        let detail = c
+            .detail
+            .as_ref()
+            .map_or(String::new(), |d| format!(" [{d}]"));
+        eprintln!("  {}) {}{label}{detail}", i + 1, c.slug);
     }
     eprint!("{kind} number: ");
     let mut line = String::new();
@@ -66,6 +68,7 @@ mod tests {
             .map(|s| Choice {
                 slug: (*s).to_owned(),
                 name: None,
+                detail: None,
             })
             .collect()
     }

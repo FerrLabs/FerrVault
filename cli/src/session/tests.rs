@@ -227,6 +227,24 @@ fn metadata_round_trips_and_stays_far_below_a_windows_credential_blob() {
     assert_eq!(back.refresh_token.as_str(), "old-refresh");
 }
 
+#[test]
+fn a_corrupted_stored_expiry_is_treated_as_expired_instead_of_panicking() {
+    for corrupt in [DateTime::<Utc>::MIN_UTC, DateTime::<Utc>::MAX_UTC] {
+        let mut meta = session(100).meta();
+        meta.expires_at = corrupt;
+        let json = serde_json::to_string(&meta).unwrap();
+        let loaded = Session::from_parts(
+            serde_json::from_str(&json).unwrap(),
+            Zeroizing::new("a".into()),
+            Zeroizing::new("r".into()),
+        );
+        assert_eq!(
+            loaded.needs_refresh(Utc::now()),
+            corrupt == DateTime::<Utc>::MIN_UTC
+        );
+    }
+}
+
 fn grant_with(expires_in: i64) -> TokenGrant {
     serde_json::from_value(json!({
         "token": "a", "refresh_token": "r", "expires_in": expires_in

@@ -99,7 +99,9 @@ impl Session {
     }
 
     fn needs_refresh(&self, now: DateTime<Utc>) -> bool {
-        self.expires_at - Duration::seconds(REFRESH_SKEW_SECONDS) <= now
+        self.expires_at
+            .checked_sub_signed(Duration::seconds(REFRESH_SKEW_SECONDS))
+            .is_none_or(|refresh_at| refresh_at <= now)
     }
 }
 

@@ -4,16 +4,6 @@ All notable changes to `ferrvault-cli` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
-
-### Features
-
-- feat(cli): OAuth login through auth.ferrlabs.com (browser with loopback PKCE, `--device` flow), transparent token refresh, org and vault selection, remote session end on `logout`
-
-### Bug Fixes
-
-- fix(cli): `login` now honours `--ca-cert`, `--client-cert`, `--client-key`, `--pin-sha256` and the `--insecure-skip-verify` gate
-
 ## [1.0.0] - 2026-10-31
 
 ### Breaking Changes

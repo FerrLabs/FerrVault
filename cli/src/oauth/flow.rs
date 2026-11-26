@@ -4,12 +4,12 @@ use anyhow::{Context, Result};
 use reqwest::Url;
 
 use super::CLIENT_ID;
-use super::idp::{IdpClient, TokenGrant};
+use super::idp::{IdpClient, TokenGrant, endpoint};
 use super::loopback::CallbackServer;
 use super::pkce::{Pkce, random_state};
 
 const CALLBACK_TIMEOUT: Duration = Duration::from_secs(300);
-const AUTHORIZE_PATH: &str = "/authorize";
+const AUTHORIZE_SEGMENT: &str = "authorize";
 
 pub async fn browser_login(idp: &IdpClient, open: impl FnOnce(&Url)) -> Result<TokenGrant> {
     let server = CallbackServer::bind().await?;
@@ -25,9 +25,7 @@ pub async fn browser_login(idp: &IdpClient, open: impl FnOnce(&Url)) -> Result<T
 }
 
 pub fn authorize_url(base: &Url, redirect_uri: &str, challenge: &str, state: &str) -> Result<Url> {
-    let mut url = base
-        .join(AUTHORIZE_PATH)
-        .context("building authorize URL")?;
+    let mut url = endpoint(base, &[AUTHORIZE_SEGMENT]).context("building authorize URL")?;
     url.query_pairs_mut()
         .append_pair("client_id", CLIENT_ID)
         .append_pair("redirect_uri", redirect_uri)
@@ -81,6 +79,23 @@ mod tests {
             )
         })
         .await
+    }
+
+    #[test]
+    fn a_path_prefix_on_the_idp_url_is_kept() {
+        let base = Url::parse("https://host.example/tenant").unwrap();
+        let url = authorize_url(&base, "http://127.0.0.1:1/callback", "c", "s").unwrap();
+        assert_eq!(url.path(), "/tenant/authorize");
+        let trailing = Url::parse("https://host.example/tenant/").unwrap();
+        assert_eq!(
+            endpoint(&trailing, &["auth", "refresh"]).unwrap().path(),
+            "/tenant/auth/refresh"
+        );
+        let root = Url::parse("https://auth.ferrlabs.com").unwrap();
+        assert_eq!(
+            endpoint(&root, &["auth", "refresh"]).unwrap().path(),
+            "/auth/refresh"
+        );
     }
 
     fn query(url: &Url, key: &str) -> String {

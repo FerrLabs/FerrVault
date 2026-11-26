@@ -61,7 +61,8 @@ impl ApiClient {
             .into_iter()
             .map(|m| Choice {
                 slug: m.org_id,
-                name: m.role,
+                name: None,
+                detail: m.role,
             })
             .collect())
     }

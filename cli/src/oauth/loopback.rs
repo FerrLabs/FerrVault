@@ -4,6 +4,7 @@ use anyhow::{Context, Result, anyhow};
 use reqwest::Url;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::mpsc;
 
 const CALLBACK_PATH: &str = "/callback";
 const MAX_REQUEST_BYTES: usize = 16 * 1024;
@@ -34,38 +35,55 @@ impl CallbackServer {
     }
 
     async fn serve(&self, expected_state: &str) -> Result<String> {
+        let (outcomes, mut results) = mpsc::unbounded_channel();
         loop {
-            let (mut stream, _) = self.listener.accept().await.context("accepting callback")?;
-            let Ok(Some(target)) = read_request_target(&mut stream).await else {
-                respond(&mut stream, 400, "Bad request").await;
-                continue;
-            };
-            let Ok(url) = Url::parse(&format!("http://127.0.0.1{target}")) else {
-                respond(&mut stream, 400, "Bad request").await;
-                continue;
-            };
-            if url.path() != CALLBACK_PATH {
-                respond(&mut stream, 404, "Not found").await;
-                continue;
+            tokio::select! {
+                accepted = self.listener.accept() => {
+                    let (stream, _) = accepted.context("accepting callback")?;
+                    let state = expected_state.to_owned();
+                    let outcomes = outcomes.clone();
+                    tokio::spawn(async move {
+                        if let Some(outcome) = handle_connection(stream, &state).await {
+                            let _ = outcomes.send(outcome);
+                        }
+                    });
+                }
+                Some(outcome) = results.recv() => return outcome,
             }
-            match interpret(&url, expected_state) {
-                Callback::WrongState => {
-                    respond(&mut stream, 400, "This login attempt does not match.").await;
-                }
-                Callback::Code(code) => {
-                    respond(
-                        &mut stream,
-                        200,
-                        "Login complete. You can close this tab and return to the terminal.",
-                    )
-                    .await;
-                    return Ok(code);
-                }
-                Callback::Failed(e) => {
-                    respond(&mut stream, 400, "Login failed. Return to the terminal.").await;
-                    return Err(e);
-                }
-            }
+        }
+    }
+}
+
+async fn handle_connection(mut stream: TcpStream, expected_state: &str) -> Option<Result<String>> {
+    let Ok(Some(target)) = read_request_target(&mut stream).await else {
+        respond(&mut stream, 400, "Bad request").await;
+        return None;
+    };
+    let Ok(url) = Url::parse(&format!("http://127.0.0.1{target}")) else {
+        respond(&mut stream, 400, "Bad request").await;
+        return None;
+    };
+    if url.path() != CALLBACK_PATH {
+        respond(&mut stream, 404, "Not found").await;
+        return None;
+    }
+    match interpret(&url, expected_state) {
+        Callback::WrongState => {
+            respond(&mut stream, 400, "This login attempt does not match.").await;
+            None
+        }
+        Callback::Code(code) => {
+            respond(
+                &mut stream,
+                200,
+                "Login complete. You can close this tab and return to the terminal.",
+            )
+            .await;
+            Some(Ok(code))
+        }
+        Callback::Failed(e) => {
+            respond(&mut stream, 400, "Login failed. Return to the terminal.").await;
+            Some(Err(e))
         }
     }
 }
@@ -214,5 +232,23 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(err.contains("timed out"));
+    }
+
+    #[tokio::test]
+    async fn an_idle_preconnect_socket_does_not_delay_the_real_callback() {
+        let server = CallbackServer::bind().await.unwrap();
+        let redirect = server.redirect_uri();
+        let port = redirect
+            .trim_start_matches("http://127.0.0.1:")
+            .trim_end_matches("/callback")
+            .to_owned();
+        let waiter = tokio::spawn(server.wait_for_code("good", Duration::from_secs(10)));
+        let _idle = TcpStream::connect(format!("127.0.0.1:{port}"))
+            .await
+            .unwrap();
+        let started = std::time::Instant::now();
+        get(format!("{redirect}?code=abc&state=good")).await;
+        assert_eq!(waiter.await.unwrap().unwrap(), "abc");
+        assert!(started.elapsed() < Duration::from_secs(2));
     }
 }

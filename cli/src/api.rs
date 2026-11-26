@@ -29,6 +29,8 @@ pub struct Choice {
     pub slug: String,
     #[serde(default)]
     pub name: Option<String>,
+    #[serde(skip)]
+    pub detail: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
