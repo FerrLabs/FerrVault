@@ -13,8 +13,9 @@ jobs:
       contents: read
       pull-requests: write
     name: CI
-    uses: FerrLabs/.github/.github/workflows/reusable-ci-go.yml@39502a0fbaa351acb517c0113136c199f5e16e14 # main
+    uses: FerrLabs/.github/.github/workflows/reusable-ci-go.yml@47ce918cb6fcd25f410d6e8155cba963d660a13f # main
     with:
       build-paths: ./cmd/...
       enable-sonar: true
+      sonar-exclusions: '**/node_modules/**,**/dist/**,**/build/**,**/target/**,**/coverage/**,**/.next/**,**/out/**,**/vendor/**,**/*.min.js,**/*.min.css,**/*_test.go,**/__tests__/**,**/*.test.ts,mcp/**'
     secrets: inherit
