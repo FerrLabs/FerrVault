@@ -22,7 +22,7 @@ Fetch secrets from a vault and hand them to a cluster, a process, a workflow or 
 | Directory | What | Released as | Tags |
 | --- | --- | --- | --- |
 | repository root, [`cmd`](cmd), [`internal`](internal), [`api`](api), [`charts`](charts) | Kubernetes operator (Go) | `ghcr.io/ferrlabs/ferrvault-operator` and the `ferrvault-operator` Helm chart | `v*` |
-| [`cli`](cli) | `ferrvault` command line client (Rust), see [`cli/README.md`](cli/README.md) | binaries on [GitHub releases](https://github.com/FerrLabs/FerrVault/releases) | `cli-v*` |
+| [`cli`](cli) | `ferrvault` command line client (Rust, OAuth browser or device login, or a `fvsat_` token), see [`cli/README.md`](cli/README.md) | binaries on [GitHub releases](https://github.com/FerrLabs/FerrVault/releases) | `cli-v*` |
 | [`action`](action) | GitHub Action that injects secrets as masked env vars, see [`action/README.md`](action/README.md) | the repository tag | `v*` |
 | [`mcp`](mcp) | MCP server, see [`mcp/README.md`](mcp/README.md) | [`@ferrvault/mcp`](https://www.npmjs.com/package/@ferrvault/mcp) on npm | `mcp-v*` |
 

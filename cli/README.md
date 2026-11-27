@@ -16,21 +16,55 @@ cargo install --git https://github.com/FerrLabs/FerrVault ferrvault-cli
 ## First login
 
 ```bash
-# Stores the URL and token in the OS keyring. No file on disk.
+# Interactive terminal: opens your browser (authorization code + PKCE on a
+# 127.0.0.1 loopback port) and stores the session in the OS keyring.
 ferrvault login --url https://api.ferrvault.example.com
-# token will be read from stdin if not passed via --token / FERRVAULT_TOKEN
+
+# Host without a browser: prints a short code to confirm on another device.
+ferrvault login --url https://api.ferrvault.example.com --device
+
+# Several organizations, vaults or environments? Pick them up front (or answer
+# the prompt). --org takes the organization id.
+ferrvault login --url https://api.ferrvault.example.com --org <org-id> --vault payments --env default
+
+# Service-account token (CI, scripts): unchanged.
+ferrvault login --url https://api.ferrvault.example.com --with-token
+printf '%s' "$SAT" | ferrvault login --url https://api.ferrvault.example.com
 ```
 
-The login flow validates the token against `/v1/operator/me` before
-storing anything, so a typo fails loudly instead of silently.
+`login` picks the method like this: `--token` / `FERRVAULT_TOKEN` or a piped
+stdin means a `fvsat_` token; `--device` means the device flow; an interactive
+terminal with no token opens the browser. `--with-token` forces the masked
+token prompt on a terminal.
+
+Logging in again, or switching to a SAT, ends the previous OAuth session at the
+identity provider first (a failure only warns).
+
+A `fvsat_` token is validated against `/v1/operator/me` before anything is
+stored. An OAuth login stores an access token and a refresh token; the access
+token is refreshed transparently when it expires or the API answers 401, and
+the rotated pair is written back to the keyring. Refreshes are serialized across CLI processes with a lock file under your state directory (it holds no data), because the identity provider ends the session if a rotated refresh token is reused. If the refresh token is
+revoked or expired, run `ferrvault login` again. `FERRVAULT_TOKEN` and
+`--token` always win over a stored session.
+
+An OAuth session calls the same user routes as the FerrVault app, with the
+session as bearer token and the organization in `x-ferrvault-org`, so your
+vault roles apply and audit entries name you. It is scoped to the vault and
+environment chosen at login (re-run `login` to change them). With a session,
+`get --names` is all-or-nothing: one missing name fails the whole call.
+
+The identity provider defaults to `https://auth.ferrlabs.com`
+(`--idp-url` / `FERRVAULT_IDP_URL` to override). `--ca-cert` and
+`--insecure-skip-verify` apply to it as well; `--client-cert` and
+`--pin-sha256` apply only to the FerrVault API.
 
 ## Commands
 
 | Command                       | What it does                                                |
 | ----------------------------- | ----------------------------------------------------------- |
-| `ferrvault login`             | Store url + token in OS keyring.                            |
-| `ferrvault logout`            | Forget url + token.                                         |
-| `ferrvault whoami [--json]`   | Show the bound vault, role, label, and expiry.              |
+| `ferrvault login`             | Log in (browser, `--device`, or SAT) and store the credentials in the OS keyring. |
+| `ferrvault logout`            | End the OAuth session at the identity provider where possible, then forget url + credentials. |
+| `ferrvault whoami [--json]`   | Show the bound vault, role, label, and expiry (SAT) or user, org and role, vault, environment and access token expiry (OAuth). |
 | `ferrvault list [--json]`     | List secret names + current version (no values).            |
 | `ferrvault get NAME`          | Print a single secret value to stdout.                      |
 | `ferrvault get --all`         | Print every secret (with `--format env/dotenv/json`).       |
@@ -73,7 +107,10 @@ ferrvault exec --names DATABASE_URL,STRIPE_KEY -- npm run start
 
 ## Storage
 
-The token is stored in the OS-native credential store:
+The credentials (a SAT, or an OAuth session: the access token, the refresh token and a small
+metadata entry with the selected org, vault and environment, kept as separate
+keyring entries to stay under per-entry size limits) are stored in the OS-native credential
+store:
 
 - Windows → DPAPI / Credential Manager
 - macOS → Keychain
@@ -81,8 +118,12 @@ The token is stored in the OS-native credential store:
   `keepassxc` if you don't already have one.
 
 There is no fallback to a plain file on disk. If no keyring is
-available, `login` fails loudly. CI environments should pass the token
+available, `login` fails loudly. CI environments should pass a SAT
 via `FERRVAULT_TOKEN` instead of using `login`.
+
+An OAuth session is a user-wide credential (every org and vault the account
+can reach), unlike a SAT, which is bound to one vault. The CLI never prints
+it; `logout` ends the session at the identity provider, which revokes the refresh token.
 
 ## Threat model
 

@@ -1,17 +1,34 @@
 use std::path::Path;
+use std::sync::Arc;
 
 use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, Utc};
-use reqwest::{Client, StatusCode, Url};
+use reqwest::{Client, Method, StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
+use crate::session::{SessionAuth, SessionSummary};
 use crate::tls::{TlsOptions, build_client};
 
-#[derive(Debug, Clone)]
+pub enum Auth {
+    Sat(Zeroizing<String>),
+    Session(Arc<SessionAuth>),
+}
+
 pub struct ApiConfig {
     pub base_url: Url,
-    pub token: Zeroizing<String>,
+    pub auth: Auth,
+}
+
+const ORG_HEADER: &str = "x-ferrvault-org";
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Choice {
+    pub slug: String,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(skip)]
+    pub detail: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -35,6 +52,7 @@ pub struct OperatorMe {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct InventoryItem {
     pub name: String,
+    #[serde(alias = "current_version")]
     pub version: i32,
     pub updated_at: DateTime<Utc>,
 }
@@ -45,8 +63,10 @@ pub struct BulkReadHit {
     #[serde(skip_serializing)]
     pub value: String,
     #[allow(dead_code)]
+    #[serde(alias = "current_version")]
     pub version: i32,
     #[allow(dead_code)]
+    #[serde(alias = "updated_at")]
     pub fetched_at: DateTime<Utc>,
 }
 
@@ -56,11 +76,26 @@ pub struct BulkReadResponse {
     pub missing: Vec<String>,
 }
 
-#[derive(Debug, Serialize)]
+const NO_BODY: Option<&()> = None;
+
+#[derive(Serialize)]
 struct RevealBody<'a> {
     vault: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
     names: Option<&'a [String]>,
+}
+
+#[derive(Serialize)]
+struct CreateBody<'a> {
+    vault: &'a str,
+    name: &'a str,
+    value: &'a str,
+}
+
+#[derive(Serialize)]
+struct UpdateBody<'a> {
+    vault: &'a str,
+    value: &'a str,
 }
 
 pub struct ApiClient {
@@ -74,29 +109,61 @@ impl ApiClient {
         Ok(Self { cfg, http })
     }
 
+    #[cfg(test)]
+    pub fn with_http(cfg: ApiConfig, http: Client) -> Self {
+        Self { cfg, http }
+    }
+
     pub async fn me(&self) -> Result<OperatorMe> {
-        self.get_json("/operator/me").await
+        self.get_json(&["operator", "me"]).await
+    }
+
+    pub async fn vault_slug(&self) -> Result<String> {
+        match &self.cfg.auth {
+            Auth::Sat(_) => Ok(self.me().await?.vault_slug),
+            Auth::Session(s) => s
+                .vault()
+                .await
+                .ok_or_else(|| anyhow!("no vault selected; run `ferrvault login --vault <slug>`")),
+        }
+    }
+
+    pub async fn describe_scope(&self, vault: &str) -> String {
+        match &self.cfg.auth {
+            Auth::Sat(_) => format!("vault `{vault}`"),
+            Auth::Session(s) => match s.summary().await.environment {
+                Some(env) => format!("vault `{vault}`, environment `{env}`"),
+                None => format!("vault `{vault}`"),
+            },
+        }
+    }
+
+    pub async fn session_summary(&self) -> Option<SessionSummary> {
+        match &self.cfg.auth {
+            Auth::Sat(_) => None,
+            Auth::Session(s) => Some(s.summary().await),
+        }
     }
 
     pub async fn inventory(&self) -> Result<Vec<InventoryItem>> {
-        self.get_json("/operator/secrets/list").await
+        match &self.cfg.auth {
+            Auth::Sat(_) => self.get_json(&["operator", "secrets", "list"]).await,
+            Auth::Session(s) => self.user_inventory(s).await,
+        }
     }
 
     pub async fn reveal(&self, vault: &str, names: Option<&[String]>) -> Result<BulkReadResponse> {
-        let url = self
-            .cfg
-            .base_url
-            .join("/operator/secrets/reveal")
-            .context("constructing reveal URL")?;
-        let body = RevealBody { vault, names };
+        if let Auth::Session(s) = &self.cfg.auth {
+            return self.user_reveal(s, names).await;
+        }
         let resp = self
-            .http
-            .post(url)
-            .bearer_auth(self.cfg.token.as_str())
-            .json(&body)
-            .send()
-            .await
-            .context("POST /operator/secrets/reveal")?;
+            .send(
+                Method::POST,
+                &["operator", "secrets", "reveal"],
+                &[],
+                Some(&RevealBody { vault, names }),
+            )
+            .await?;
         handle(resp).await
     }
 
@@ -106,20 +173,17 @@ impl ApiClient {
         name: &str,
         value: &str,
     ) -> Result<serde_json::Value> {
-        let url = self
-            .cfg
-            .base_url
-            .join("/operator/secrets")
-            .context("constructing create URL")?;
-        let body = serde_json::json!({ "vault": vault, "name": name, "value": value });
+        if let Auth::Session(s) = &self.cfg.auth {
+            return self.user_create(s, name, value).await;
+        }
         let resp = self
-            .http
-            .post(url)
-            .bearer_auth(self.cfg.token.as_str())
-            .json(&body)
-            .send()
-            .await
-            .context("POST /operator/secrets")?;
+            .send(
+                Method::POST,
+                &["operator", "secrets"],
+                &[],
+                Some(&CreateBody { vault, name, value }),
+            )
+            .await?;
         handle(resp).await
     }
 
@@ -129,59 +193,107 @@ impl ApiClient {
         name: &str,
         value: &str,
     ) -> Result<serde_json::Value> {
-        let url = self
-            .cfg
-            .base_url
-            .join(&format!("/operator/secrets/{name}"))
-            .with_context(|| format!("constructing update URL for {name}"))?;
-        let body = serde_json::json!({ "vault": vault, "value": value });
+        if let Auth::Session(s) = &self.cfg.auth {
+            return self.user_update(s, name, value).await;
+        }
         let resp = self
-            .http
-            .put(url)
-            .bearer_auth(self.cfg.token.as_str())
-            .json(&body)
-            .send()
-            .await
-            .with_context(|| format!("PUT /operator/secrets/{name}"))?;
+            .send(
+                Method::PUT,
+                &["operator", "secrets", name],
+                &[],
+                Some(&UpdateBody { vault, value }),
+            )
+            .await?;
         handle(resp).await
     }
 
     pub async fn delete_secret(&self, vault: &str, name: &str) -> Result<()> {
-        let mut url = self
-            .cfg
-            .base_url
-            .join(&format!("/operator/secrets/{name}"))
-            .with_context(|| format!("constructing delete URL for {name}"))?;
-        url.query_pairs_mut().append_pair("vault", vault);
+        if let Auth::Session(s) = &self.cfg.auth {
+            return self.user_delete(s, name).await;
+        }
         let resp = self
-            .http
-            .delete(url)
-            .bearer_auth(self.cfg.token.as_str())
-            .send()
-            .await
-            .with_context(|| format!("DELETE /operator/secrets/{name}"))?;
-        let status = resp.status();
-        if status.is_success() {
+            .send(
+                Method::DELETE,
+                &["operator", "secrets", name],
+                &[("vault", vault)],
+                NO_BODY,
+            )
+            .await?;
+        if resp.status().is_success() {
             return Ok(());
         }
         handle::<serde_json::Value>(resp).await.map(|_| ())
     }
 
-    async fn get_json<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T> {
-        let url = self
-            .cfg
-            .base_url
-            .join(path)
-            .with_context(|| format!("constructing URL for {path}"))?;
-        let resp = self
-            .http
-            .get(url)
-            .bearer_auth(self.cfg.token.as_str())
-            .send()
-            .await
-            .with_context(|| format!("GET {path}"))?;
+    async fn get_json<T: serde::de::DeserializeOwned>(&self, route: &[&str]) -> Result<T> {
+        let resp = self.send(Method::GET, route, &[], NO_BODY).await?;
         handle(resp).await
     }
+
+    async fn send<B: Serialize + ?Sized>(
+        &self,
+        method: Method,
+        route: &[&str],
+        query: &[(&str, &str)],
+        body: Option<&B>,
+    ) -> Result<reqwest::Response> {
+        let url = self.build_url(route, query)?;
+        let mut retried = false;
+        loop {
+            let (token, org) = self.credential().await?;
+            let mut req = self
+                .http
+                .request(method.clone(), url.clone())
+                .bearer_auth(token.as_str());
+            if let Some(org) = org {
+                req = req.header(ORG_HEADER, org);
+            }
+            if let Some(body) = body {
+                req = req.json(body);
+            }
+            let resp = req
+                .send()
+                .await
+                .with_context(|| format!("{method} {}", url.path()))?;
+            if let (StatusCode::UNAUTHORIZED, Auth::Session(session), false) =
+                (resp.status(), &self.cfg.auth, retried)
+            {
+                session.refresh_after_rejection(token.as_str()).await?;
+                retried = true;
+                continue;
+            }
+            return Ok(resp);
+        }
+    }
+
+    fn build_url(&self, route: &[&str], query: &[(&str, &str)]) -> Result<Url> {
+        if let Some(bad) = route.iter().find(|s| is_unsafe_segment(s)) {
+            return Err(anyhow!("{bad:?} is not a valid name"));
+        }
+        let mut url = self.cfg.base_url.clone();
+        url.path_segments_mut()
+            .map_err(|()| anyhow!("api-url cannot carry a path"))?
+            .clear()
+            .extend(route);
+        if !query.is_empty() {
+            url.query_pairs_mut().extend_pairs(query);
+        }
+        Ok(url)
+    }
+
+    async fn credential(&self) -> Result<(Zeroizing<String>, Option<String>)> {
+        match &self.cfg.auth {
+            Auth::Sat(token) => Ok((token.clone(), None)),
+            Auth::Session(session) => {
+                let c = session.credential().await?;
+                Ok((c.token, c.org))
+            }
+        }
+    }
+}
+
+fn is_unsafe_segment(segment: &str) -> bool {
+    matches!(segment, "" | "." | "..") || segment.contains(['\t', '\n', '\r'])
 }
 
 async fn handle<T: serde::de::DeserializeOwned>(resp: reqwest::Response) -> Result<T> {
@@ -200,11 +312,11 @@ async fn handle<T: serde::de::DeserializeOwned>(resp: reqwest::Response) -> Resu
     let body = resp.text().await.unwrap_or_default();
     match status {
         StatusCode::UNAUTHORIZED => Err(anyhow!(
-            "401 Unauthorized — token is missing, malformed, expired, or revoked. \
-             Re-run `ferrvault login` with a fresh token."
+            "401 Unauthorized — credentials are missing, malformed, expired, or revoked. \
+             Re-run `ferrvault login`."
         )),
         StatusCode::FORBIDDEN => Err(anyhow!(
-            "403 Forbidden — your token does not have the required role on this vault. \
+            "403 Forbidden — your credentials do not have the required role on this vault. \
              Server said: {body}"
         )),
         StatusCode::NOT_FOUND => Err(anyhow!("404 Not Found — {body}")),
@@ -226,6 +338,7 @@ async fn handle<T: serde::de::DeserializeOwned>(resp: reqwest::Response) -> Resu
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct TlsArgs<'a> {
     pub ca_cert: Option<&'a Path>,
     pub client_cert: Option<&'a Path>,
@@ -245,3 +358,8 @@ impl<'a> From<TlsArgs<'a>> for TlsOptions<'a> {
         }
     }
 }
+
+mod user;
+
+#[cfg(test)]
+mod tests;

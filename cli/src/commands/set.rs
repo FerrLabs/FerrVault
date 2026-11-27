@@ -14,7 +14,8 @@ pub async fn run(
     from_file: Option<PathBuf>,
     update: bool,
 ) -> Result<()> {
-    let me = client.me().await?;
+    let vault = client.vault_slug().await?;
+    let scope = client.describe_scope(&vault).await;
 
     let plaintext: Zeroizing<String> = match (value, stdin, from_file) {
         (Some(v), false, None) => Zeroizing::new(v),
@@ -38,11 +39,11 @@ pub async fn run(
 
     let result = if update {
         client
-            .update_secret(&me.vault_slug, &name, plaintext.as_str())
+            .update_secret(&vault, &name, plaintext.as_str())
             .await
     } else {
         match client
-            .create_secret(&me.vault_slug, &name, plaintext.as_str())
+            .create_secret(&vault, &name, plaintext.as_str())
             .await
         {
             Ok(v) => Ok(v),
@@ -65,9 +66,8 @@ pub async fn run(
         }
     })?;
     eprintln!(
-        "ferrvault: {} `{name}` in vault `{}`.",
-        if update { "rotated" } else { "created" },
-        me.vault_slug
+        "ferrvault: {} `{name}` in {scope}.",
+        if update { "rotated" } else { "created" }
     );
     Ok(())
 }

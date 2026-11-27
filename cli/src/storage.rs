@@ -4,9 +4,14 @@ use anyhow::{Context, Result, anyhow};
 use keyring_core::{Entry, Error as KeyringError};
 use zeroize::Zeroizing;
 
+use crate::session::Session;
+
 const SERVICE: &str = "ferrvault-cli";
 const TOKEN_KEY: &str = "token";
 const URL_KEY: &str = "api_url";
+const SESSION_KEY: &str = "session";
+const SESSION_ACCESS_KEY: &str = "session.access";
+const SESSION_REFRESH_KEY: &str = "session.refresh";
 
 fn open_entry(key: &str, slot: &str) -> Result<Entry> {
     static STORE: OnceLock<Result<(), String>> = OnceLock::new();
@@ -93,5 +98,56 @@ impl CredentialStore {
             Ok(()) | Err(KeyringError::NoEntry) => Ok(()),
             Err(e) => Err(anyhow!("deleting url from OS keyring: {e}")),
         }
+    }
+
+    pub fn save_session(session: &Session) -> Result<()> {
+        set_secret(
+            SESSION_REFRESH_KEY,
+            "session refresh",
+            &session.refresh_token,
+        )?;
+        set_secret(SESSION_ACCESS_KEY, "session access", &session.access_token)?;
+        let meta = serde_json::to_string(&session.meta()).context("encoding session")?;
+        set_secret(SESSION_KEY, "session", &meta)
+    }
+
+    pub fn load_session() -> Result<Option<Session>> {
+        let Some(meta) = get_secret(SESSION_KEY, "session")? else {
+            return Ok(None);
+        };
+        let incomplete = || anyhow!("stored session is incomplete; run `ferrvault login` again");
+        let access = get_secret(SESSION_ACCESS_KEY, "session access")?.ok_or_else(incomplete)?;
+        let refresh = get_secret(SESSION_REFRESH_KEY, "session refresh")?.ok_or_else(incomplete)?;
+        let meta = serde_json::from_str(&meta)
+            .context("decoding stored session; run `ferrvault login` again")?;
+        Ok(Some(Session::from_parts(meta, access, refresh)))
+    }
+
+    pub fn delete_session() -> Result<()> {
+        for (key, slot) in [
+            (SESSION_KEY, "session"),
+            (SESSION_ACCESS_KEY, "session access"),
+            (SESSION_REFRESH_KEY, "session refresh"),
+        ] {
+            match open_entry(key, slot)?.delete_credential() {
+                Ok(()) | Err(KeyringError::NoEntry) => {}
+                Err(e) => return Err(anyhow!("deleting {slot} from OS keyring: {e}")),
+            }
+        }
+        Ok(())
+    }
+}
+
+fn set_secret(key: &str, slot: &str, value: &str) -> Result<()> {
+    open_entry(key, slot)?
+        .set_password(value)
+        .with_context(|| format!("writing {slot} to OS keyring"))
+}
+
+fn get_secret(key: &str, slot: &str) -> Result<Option<Zeroizing<String>>> {
+    match open_entry(key, slot)?.get_password() {
+        Ok(p) => Ok(Some(Zeroizing::new(p))),
+        Err(KeyringError::NoEntry) => Ok(None),
+        Err(e) => Err(anyhow!("reading {slot} from OS keyring: {e}")),
     }
 }

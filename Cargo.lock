@@ -588,6 +588,7 @@ dependencies = [
  "base64 0.23.1",
  "chrono",
  "clap",
+ "getrandom 0.4.3",
  "hostname",
  "keyring-core",
  "reqwest",

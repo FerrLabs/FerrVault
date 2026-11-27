@@ -4,7 +4,12 @@ use clap::Parser;
 mod api;
 mod cli;
 mod commands;
+mod lock;
+mod oauth;
+mod session;
 mod storage;
+#[cfg(test)]
+mod testing;
 mod tls;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 2)]

@@ -21,7 +21,7 @@ pub async fn run(
         return Err(anyhow!("--names conflicts with --all"));
     }
 
-    let me = client.me().await?;
+    let vault = client.vault_slug().await?;
     let target: Option<Vec<String>> = if all || (names.is_empty() && only.is_empty()) {
         None
     } else if !names.is_empty() {
@@ -30,7 +30,7 @@ pub async fn run(
         None
     };
 
-    let resp = client.reveal(&me.vault_slug, target.as_deref()).await?;
+    let resp = client.reveal(&vault, target.as_deref()).await?;
     if !resp.missing.is_empty() {
         eprintln!(
             "ferrvault: {} secret(s) requested but missing: {}",
