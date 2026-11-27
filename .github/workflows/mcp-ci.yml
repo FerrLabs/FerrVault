@@ -24,7 +24,7 @@ jobs:
       pull-requests: write
       packages: read
     name: Test
-    uses: FerrLabs/.github/.github/workflows/reusable-ci-node.yml@9796e976e6b1a071578aed08b164fb483bf01a86 # main
+    uses: FerrLabs/.github/.github/workflows/reusable-ci-node.yml@47ce918cb6fcd25f410d6e8155cba963d660a13f # main
     with:
       working-directory: mcp
       node-version: "24"
