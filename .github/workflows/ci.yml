@@ -17,4 +17,6 @@ jobs:
     with:
       build-paths: ./cmd/...
       enable-sonar: true
-    secrets: inherit
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
