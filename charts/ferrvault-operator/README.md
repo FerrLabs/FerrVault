@@ -72,6 +72,8 @@ kubectl delete crd ferrvaultsecrets.ferrvault.com ferrvaultconnections.ferrvault
 | `podSecurityContext` | non-root 65532, seccomp RuntimeDefault | |
 | `containerSecurityContext` | no privesc, drop ALL caps, readOnlyRootFS | |
 | `nodeSelector`, `tolerations`, `affinity` | `{}` / `[]` / `{}` | |
+| `oidc.tokenPath` | `""` | Only token file `spec.oidc` connections may read (empty = `/var/run/secrets/ferrvault/token`). |
+| `oidc.url` | `""` | Only URL `spec.oidc` connections may send the token to. Empty refuses every oidc connection. |
 | `extraEnv` | `[]` | Extra env vars on the manager container. |
 
 See [`values.yaml`](values.yaml) for the full surface with comments.

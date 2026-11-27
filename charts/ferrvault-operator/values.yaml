@@ -34,6 +34,13 @@ defaultRefreshInterval: 1h
 # the shortest reconcile a healthy operator is guaranteed to perform.
 stallThreshold: 15m
 reconcileTimeout: 2m
+# Workload-identity (`spec.oidc`) settings. A connection using `oidc` may only
+# read `tokenPath` and send the token to `url`; anything else is refused.
+oidc:
+  # Projected ServiceAccount token file. Empty = /var/run/secrets/ferrvault/token.
+  tokenPath: ""
+  # Exact FerrVault URL the token is sent to. Empty refuses every oidc connection.
+  url: ""
 # Log level for the operator's zap logger (debug, info, warn, error).
 logLevel: info
 # Extra command-line flags appended to the manager binary.

@@ -49,6 +49,7 @@ func main() {
 		watchNamespace         string
 		stallThreshold         time.Duration
 		reconcileTimeout       time.Duration
+		oidcSettings           controller.OIDCSettings
 	)
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080",
@@ -70,6 +71,12 @@ func main() {
 	flag.DurationVar(&reconcileTimeout, "reconcile-timeout", 2*time.Minute,
 		"Cancel a single reconcile after this long, so one call that never returns cannot "+
 			"hold the work queue. Refused below the longest one FerrVault API call can take with its retries.")
+
+	flag.StringVar(&oidcSettings.TokenPath, "oidc-token-path", fvv1alpha1.DefaultTokenPath,
+		"The only projected ServiceAccount token file oidc connections may read.")
+	flag.StringVar(&oidcSettings.URL, "oidc-url", "",
+		"The only FerrVault URL oidc connections may send the token to. "+
+			"Empty refuses every oidc connection.")
 
 	opts := zap.Options{Development: false}
 	opts.BindFlags(flag.CommandLine)
@@ -131,7 +138,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	broker := controller.NewTokenBroker(mgr.GetClient())
+	broker := controller.NewTokenBroker(mgr.GetClient(), oidcSettings)
 	heartbeat := controller.NewHeartbeat(time.Now())
 
 	if err := (&controller.FerrVaultSecretReconciler{

@@ -41,7 +41,7 @@ func adoptable(secret *corev1.Secret, cr *fvv1alpha1.FerrVaultSecret, allowUnman
 func (r *FerrVaultSecretReconciler) loadToken(ctx context.Context, conn *fvv1alpha1.FerrVaultConnection) (string, error) {
 	broker := r.Broker
 	if broker == nil {
-		broker = NewTokenBroker(r.Client)
+		broker = NewTokenBroker(r.Client, OIDCSettings{})
 	}
 	return broker.TokenFor(ctx, conn)
 }

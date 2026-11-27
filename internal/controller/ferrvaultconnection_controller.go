@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -182,10 +183,14 @@ func (r *FerrVaultConnectionReconciler) probe(
 ) (metav1.ConditionStatus, string, string, error) {
 	broker := r.Broker
 	if broker == nil {
-		broker = NewTokenBroker(r.Client)
+		broker = NewTokenBroker(r.Client, OIDCSettings{})
 	}
 	token, err := broker.TokenFor(ctx, conn)
 	if err != nil {
+		var notAllowed *OIDCNotAllowedError
+		if errors.As(err, &notAllowed) {
+			return metav1.ConditionFalse, "OIDCNotAllowed", err.Error(), err
+		}
 		return metav1.ConditionFalse, "TokenUnreadable", err.Error(), err
 	}
 	ffc, err := ferrvault.New(conn.Spec.URL, token)

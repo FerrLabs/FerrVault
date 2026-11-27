@@ -65,8 +65,14 @@ type ConnectionSpec struct {
 	//
 	// Requires the FerrVault cluster resource to be pre-configured with
 	// OIDC (`PUT /orgs/:org/clusters/:id/oidc` on the FerrVault API), and
-	// the operator pod to have a projected SA token volume mounted at
-	// `oidc.tokenPath` with audience matching `oidc.audience`.
+	// the operator pod to have a projected SA token volume mounted at the
+	// operator's `--oidc-token-path` with audience matching `oidc.audience`.
+	//
+	// The operator only accepts the token path and URL set by the cluster
+	// admin (`--oidc-token-path`, `--oidc-url`). A connection whose `url`
+	// differs from `--oidc-url`, or whose `oidc.tokenPath` differs from
+	// `--oidc-token-path`, is refused (Ready=False, reason OIDCNotAllowed)
+	// and nothing is read or sent.
 	//
 	// +optional
 	OIDC *OIDCAuth `json:"oidc,omitempty"`
@@ -83,10 +89,9 @@ type OIDCAuth struct {
 	// +kubebuilder:validation:Pattern=`^[0-9a-fA-F-]{36}$`
 	ClusterID string `json:"clusterID"`
 
-	// TokenPath is the filesystem location where kubelet mounts the
-	// projected ServiceAccount token. Defaults to
-	// `/var/run/secrets/ferrvault/token` — match this in the operator pod's
-	// `volumeMounts` + `serviceAccountToken` projection.
+	// TokenPath must be empty or equal the operator's `--oidc-token-path`
+	// (default `/var/run/secrets/ferrvault/token`). The path is a cluster
+	// admin setting; any other value is refused.
 	//
 	// +optional
 	TokenPath string `json:"tokenPath,omitempty"`

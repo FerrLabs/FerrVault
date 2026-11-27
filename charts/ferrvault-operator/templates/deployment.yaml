@@ -38,6 +38,12 @@ spec:
             - --health-probe-bind-address=:{{ .Values.probe.port }}
             - --default-refresh-interval={{ .Values.defaultRefreshInterval }}
             - --stall-threshold={{ .Values.stallThreshold }}
+            {{- with .Values.oidc.tokenPath }}
+            - --oidc-token-path={{ . }}
+            {{- end }}
+            {{- with .Values.oidc.url }}
+            - --oidc-url={{ . }}
+            {{- end }}
             - --reconcile-timeout={{ .Values.reconcileTimeout }}
             {{- if .Values.leaderElection.enabled }}
             - --leader-elect

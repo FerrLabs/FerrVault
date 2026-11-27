@@ -47,6 +47,7 @@ func brokerWithFakes(
 	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
 	return &TokenBroker{
 		Client:    c,
+		OIDC:      OIDCSettings{URL: "https://ferrvault.example.com"},
 		ReadToken: reader,
 		Exchange:  exchanger,
 	}
@@ -140,7 +141,6 @@ func TestBroker_OIDCHappyPathCaches(t *testing.T) {
 			Organization: "acme",
 			OIDC: &fvv1alpha1.OIDCAuth{
 				ClusterID: "00000000-0000-0000-0000-000000000001",
-				TokenPath: "/ignored/in/fake",
 			},
 		},
 	}

@@ -3,6 +3,10 @@
 # only the volume + volumeMount are strictly required; the rest is here
 # for context.
 #
+# The operator only sends the token to the URL given by --oidc-url and only
+# reads the file given by --oidc-token-path (default below). Connections whose
+# url or oidc.tokenPath differ are refused.
+#
 # The audience MUST match what FerrVault expects (`https://ferrflow.com` by
 # default). If you override it in `FerrVaultConnection.spec.oidc.audience`,
 # keep both sides in sync.
@@ -18,6 +22,9 @@ spec:
       containers:
         - name: manager
           image: ghcr.io/ferrlabs/ferrvault-operator:0.1.0
+          args:
+            - --oidc-token-path=/var/run/secrets/ferrvault/token
+            - --oidc-url=https://ferrvault.example.com
           resources:
             requests:
               cpu: 100m
