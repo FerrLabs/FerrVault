@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [7.0.0] - 2026-11-27
+
+### Breaking Changes
+
+- fix(controller)!: restrict oidc token path and url to operator settings (#390)
+
 ## [6.2.0] - 2026-11-27
 
 ### Features
