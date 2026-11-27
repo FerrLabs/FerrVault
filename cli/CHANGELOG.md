@@ -4,6 +4,12 @@ All notable changes to `ferrvault-cli` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.1.0] - 2026-11-27
+
+### Features
+
+- feat(cli): OAuth login with browser PKCE, device flow and token refresh (#386)
+
 ## [1.0.0] - 2026-10-31
 
 ### Breaking Changes

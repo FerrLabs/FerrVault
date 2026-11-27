@@ -4,6 +4,12 @@ All notable changes to `ferrvault-operator` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/). Releases are cut automatically from conventional commits by [FerrFlow](https://ferrflow.com).
 
+## [6.2.0] - 2026-11-27
+
+### Features
+
+- feat(cli): OAuth login with browser PKCE, device flow and token refresh (#386)
+
 ## [6.1.11] - 2026-11-27
 
 ### Bug Fixes
