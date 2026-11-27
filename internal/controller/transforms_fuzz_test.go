@@ -43,35 +43,48 @@ func FuzzApplyTransforms(f *testing.F) {
 		if !reflect.DeepEqual(input, snapshot) {
 			t.Fatalf("input mutated: before %q after %q", snapshot, input)
 		}
-		if err != nil {
-			if te := (*TransformError)(nil); !errors.As(err, &te) {
-				t.Fatalf("error is %T, want *TransformError", err)
-			}
-		}
-
-		out2, err2 := ApplyTransforms(input, transforms)
-		if (err == nil) != (err2 == nil) || !reflect.DeepEqual(out, out2) {
-			t.Fatalf("not deterministic: %q/%v vs %q/%v", out, err, out2, err2)
-		}
-
-		if err != nil {
-			return
-		}
-		switch typ {
-		case TransformPrefix:
-			if got := out[affix+key]; got != val {
-				t.Fatalf("prefix lost value for %q: %q", key, got)
-			}
-		case TransformSuffix:
-			if got := out[key+affix]; got != val {
-				t.Fatalf("suffix lost value for %q: %q", key, got)
-			}
-		case TransformBase64Decode:
-			if want, ok := decodeEither(val); ok && out[key] != want {
-				t.Fatalf("base64Decode %q: got %q want %q", val, out[key], want)
-			}
+		requireTransformError(t, err)
+		requireDeterministic(t, input, transforms, out, err)
+		if err == nil {
+			requireTransformedValue(t, typ, out, key, val, affix)
 		}
 	})
+}
+
+func requireTransformError(t *testing.T, err error) {
+	t.Helper()
+	if err == nil {
+		return
+	}
+	if te := (*TransformError)(nil); !errors.As(err, &te) {
+		t.Fatalf("error is %T, want *TransformError", err)
+	}
+}
+
+func requireDeterministic(t *testing.T, input map[string]string, transforms []fvv1alpha1.SecretTransform, out map[string]string, err error) {
+	t.Helper()
+	out2, err2 := ApplyTransforms(input, transforms)
+	if (err == nil) != (err2 == nil) || !reflect.DeepEqual(out, out2) {
+		t.Fatalf("not deterministic: %q/%v vs %q/%v", out, err, out2, err2)
+	}
+}
+
+func requireTransformedValue(t *testing.T, typ string, out map[string]string, key, val, affix string) {
+	t.Helper()
+	switch typ {
+	case TransformPrefix:
+		if got := out[affix+key]; got != val {
+			t.Fatalf("prefix lost value for %q: %q", key, got)
+		}
+	case TransformSuffix:
+		if got := out[key+affix]; got != val {
+			t.Fatalf("suffix lost value for %q: %q", key, got)
+		}
+	case TransformBase64Decode:
+		if want, ok := decodeEither(val); ok && out[key] != want {
+			t.Fatalf("base64Decode %q: got %q want %q", val, out[key], want)
+		}
+	}
 }
 
 func decodeEither(s string) (string, bool) {
