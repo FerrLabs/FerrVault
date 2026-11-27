@@ -52,12 +52,11 @@ type oidcExchanger func(ctx context.Context, baseURL, clusterID, saToken string)
 // TokenBroker resolves bearer tokens for FerrVaultConnections. Safe for
 // concurrent use by both reconcilers.
 //
-// The OIDC cache is keyed by `(namespace, connection name)` — two
-// connections in different namespaces that happen to share a cluster ID
-// still get separate cache entries because they read separate SA tokens
-// (namespace-scoped ServiceAccounts).
+// The OIDC cache is keyed by `(namespace, connection name)`.
 type TokenBroker struct {
 	Client client.Client
+
+	OIDC OIDCSettings
 
 	// ReadToken is the filesystem read for the projected SA token. Set to
 	// nil to use the default (`os.ReadFile`).
@@ -84,9 +83,10 @@ type cachedBearer struct {
 // NewTokenBroker builds a broker wired to the real filesystem and FerrVault
 // HTTP client. Test code should construct `TokenBroker{...}` directly and
 // fill the `ReadToken` / `Exchange` hooks.
-func NewTokenBroker(c client.Client) *TokenBroker {
+func NewTokenBroker(c client.Client, oidc OIDCSettings) *TokenBroker {
 	return &TokenBroker{
 		Client:    c,
+		OIDC:      oidc,
 		ReadToken: readFileString,
 		Exchange:  realExchange,
 		cache:     make(map[cacheKey]*cachedBearer),
@@ -156,7 +156,9 @@ func (b *TokenBroker) loadFromOIDC(
 	ctx context.Context,
 	conn *fvv1alpha1.FerrVaultConnection,
 ) (string, error) {
-	// Cache hit? Skip the disk read + HTTP exchange entirely.
+	if err := b.OIDC.validate(conn); err != nil {
+		return "", err
+	}
 	if cached := b.cacheGet(conn); cached != nil {
 		return *cached, nil
 	}
@@ -164,10 +166,7 @@ func (b *TokenBroker) loadFromOIDC(
 	// Read the projected SA token. Kubelet refreshes the file in place on
 	// rotation, so we read every cache miss rather than caching the JWT
 	// itself.
-	path := conn.Spec.OIDC.TokenPath
-	if path == "" {
-		path = fvv1alpha1.DefaultTokenPath
-	}
+	path := b.OIDC.tokenPath()
 	saToken, err := b.ReadToken(path)
 	if err != nil {
 		return "", fmt.Errorf("read projected SA token at %s: %w", path, err)
