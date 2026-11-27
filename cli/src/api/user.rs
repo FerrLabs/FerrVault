@@ -152,7 +152,7 @@ impl ApiClient {
                 Method::DELETE,
                 &secrets_route(&scope, &["secrets", name]),
                 &[],
-                None::<&()>,
+                super::NO_BODY,
             )
             .await?;
         if resp.status().is_success() {

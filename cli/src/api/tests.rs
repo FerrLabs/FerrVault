@@ -361,3 +361,40 @@ async fn sat_names_are_encoded_too() {
     );
     assert_eq!(sent[1].path, "/operator/secrets/a%20b%3F?vault=prod");
 }
+
+#[tokio::test]
+async fn names_with_tab_lf_or_cr_are_refused_before_any_request() {
+    let api = MockServer::start(|_| MockResponse::json(200, &json!({}))).await;
+    let idp = rotating_idp().await;
+    let (client, _) = session_client(&api, &idp, 900, Some("prod"));
+    for bad in ["A\tB", "A\nB", "A\rB"] {
+        let update = client.update_secret("prod", bad, "v").await.unwrap_err();
+        assert!(update.to_string().contains("not a valid name"), "{bad:?}");
+        assert!(
+            client.update_secret("prod", bad, "v").await.is_err(),
+            "{bad:?}"
+        );
+        assert!(client.delete_secret("prod", bad).await.is_err(), "{bad:?}");
+    }
+    assert!(api.requests().is_empty());
+}
+
+#[tokio::test]
+async fn sat_names_with_control_characters_are_refused_too() {
+    let api = MockServer::start(|_| MockResponse::json(200, &json!({}))).await;
+    let client = ApiClient::with_http(
+        ApiConfig {
+            base_url: api.url.clone(),
+            auth: Auth::Sat(Zeroizing::new("fvsat_abc".into())),
+        },
+        crate::testing::http_client(),
+    );
+    for bad in ["A\tB", "A\nB", "A\rB"] {
+        assert!(
+            client.update_secret("prod", bad, "v").await.is_err(),
+            "{bad:?}"
+        );
+        assert!(client.delete_secret("prod", bad).await.is_err(), "{bad:?}");
+    }
+    assert!(api.requests().is_empty());
+}

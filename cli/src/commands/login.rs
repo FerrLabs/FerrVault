@@ -127,7 +127,7 @@ async fn oauth_login(url: Url, args: &LoginArgs, tls: TlsArgs<'_>, device: bool)
     let input = stdin
         .is_terminal()
         .then(|| Box::new(stdin.lock()) as Box<dyn BufRead>);
-    select_scope(&client, &auth, args, input).await?;
+    select_or_sign_out(&client, &auth, args, input).await?;
 
     let session = auth.snapshot().await;
     CredentialStore::save_url(url.as_str())?;
@@ -144,6 +144,21 @@ async fn oauth_login(url: Url, args: &LoginArgs, tls: TlsArgs<'_>, device: bool)
         session.environment.as_deref().unwrap_or("-"),
     );
     Ok(())
+}
+
+async fn select_or_sign_out(
+    client: &ApiClient,
+    auth: &SessionAuth,
+    args: &LoginArgs,
+    input: Option<Box<dyn BufRead>>,
+) -> Result<()> {
+    let Err(e) = select_scope(client, auth, args, input).await else {
+        return Ok(());
+    };
+    if let Err(out) = auth.sign_out().await {
+        eprintln!("ferrvault: could not end the new session remotely ({out:#}).");
+    }
+    Err(e)
 }
 
 async fn select_scope(
@@ -244,7 +259,7 @@ mod tests {
             }
         }
 
-        async fn run_select(vault: Option<&str>) -> (Result<()>, Session, MockServer) {
+        async fn run_select(vault: Option<&str>) -> (Result<()>, Session, MockServer, MockServer) {
             let api = MockServer::start(|r| match r.path.as_str() {
                 "/me" => MockResponse::json(
                     200,
@@ -261,7 +276,11 @@ mod tests {
                 other => panic!("unexpected {other}"),
             })
             .await;
-            let idp = MockServer::start(|_| MockResponse::json(500, &json!({}))).await;
+            let idp = MockServer::start(|_| MockResponse {
+                status: 204,
+                body: String::new(),
+            })
+            .await;
             let session = Session {
                 idp_url: idp.url.to_string(),
                 access_token: Zeroizing::new("t".into()),
@@ -284,26 +303,30 @@ mod tests {
                 },
                 http_client(),
             );
-            let result = select_scope(&client, &auth, &args(vault), None).await;
-            (result, auth.snapshot().await, api)
+            let result = select_or_sign_out(&client, &auth, &args(vault), None).await;
+            (result, auth.snapshot().await, api, idp)
         }
 
         #[tokio::test]
         async fn single_org_and_environment_are_picked_and_the_vault_flag_is_honoured() {
-            let (result, session, api) = run_select(Some("b")).await;
+            let (result, session, api, idp) = run_select(Some("b")).await;
             result.unwrap();
             assert_eq!(session.org.as_deref(), Some("org-1"));
             assert_eq!(session.vault.as_deref(), Some("b"));
             assert_eq!(session.environment.as_deref(), Some("prod"));
             let vault_listing = &api.requests_to("/vaults")[0];
             assert_eq!(vault_listing.header("x-ferrvault-org"), Some("org-1"));
+            assert!(idp.requests().is_empty());
         }
 
         #[tokio::test]
         async fn several_vaults_without_a_flag_or_terminal_fail_before_saving_a_scope() {
-            let (result, session, _) = run_select(None).await;
+            let (result, session, _, idp) = run_select(None).await;
             assert!(result.unwrap_err().to_string().contains("--vault"));
             assert!(session.vault.is_none() && session.environment.is_none());
+            let logout = idp.requests_to("/auth/logout");
+            assert_eq!(logout.len(), 1);
+            assert_eq!(logout[0].header("authorization"), Some("Bearer t"));
         }
     }
 }

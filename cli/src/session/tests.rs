@@ -161,6 +161,30 @@ async fn a_stored_pair_that_is_itself_expired_is_refreshed_with_its_own_token() 
 }
 
 #[tokio::test]
+async fn a_persistent_store_that_lost_the_session_means_logged_out() {
+    let idp = single_use_idp().await;
+    let store = Arc::new(MemorySessionStore::persistent());
+    let auth = auth_for(&idp, session(-5), store.clone());
+    let err = auth.credential().await.err().unwrap().to_string();
+    assert!(err.contains("ferrvault login"), "{err}");
+    assert!(idp.requests().is_empty());
+    assert!(store.saved().is_none());
+}
+
+#[tokio::test]
+async fn a_persistent_store_with_the_session_still_refreshes() {
+    let idp = single_use_idp().await;
+    let store = Arc::new(MemorySessionStore::persistent());
+    store.save(&session(-5)).unwrap();
+    let auth = auth_for(&idp, session(-5), store.clone());
+    assert_eq!(
+        auth.credential().await.unwrap().token.as_str(),
+        "new-access"
+    );
+    assert_eq!(store.saved().unwrap().refresh_token.as_str(), "new-refresh");
+}
+
+#[tokio::test]
 async fn sign_out_sends_the_access_token_as_bearer_and_never_the_refresh_token() {
     let idp = MockServer::start(|r| {
         assert_eq!(r.path, "/auth/logout");

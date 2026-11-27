@@ -8,8 +8,6 @@ use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
 use crate::session::{SessionAuth, SessionSummary};
-
-mod user;
 use crate::tls::{TlsOptions, build_client};
 
 pub enum Auth {
@@ -269,8 +267,8 @@ impl ApiClient {
     }
 
     fn build_url(&self, route: &[&str], query: &[(&str, &str)]) -> Result<Url> {
-        if let Some(bad) = route.iter().find(|s| matches!(**s, "." | ".." | "")) {
-            return Err(anyhow!("`{bad}` is not a valid name"));
+        if let Some(bad) = route.iter().find(|s| is_unsafe_segment(s)) {
+            return Err(anyhow!("{bad:?} is not a valid name"));
         }
         let mut url = self.cfg.base_url.clone();
         url.path_segments_mut()
@@ -292,6 +290,10 @@ impl ApiClient {
             }
         }
     }
+}
+
+fn is_unsafe_segment(segment: &str) -> bool {
+    matches!(segment, "" | "." | "..") || segment.contains(['\t', '\n', '\r'])
 }
 
 async fn handle<T: serde::de::DeserializeOwned>(resp: reqwest::Response) -> Result<T> {
@@ -356,6 +358,8 @@ impl<'a> From<TlsArgs<'a>> for TlsOptions<'a> {
         }
     }
 }
+
+mod user;
 
 #[cfg(test)]
 mod tests;

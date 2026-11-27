@@ -118,11 +118,16 @@ pub trait SessionStore: Send + Sync {
     fn load(&self) -> Result<Option<Session>>;
     fn save(&self, session: &Session) -> Result<()>;
     fn lock(&self) -> Result<Box<dyn Send>>;
+    fn requires_stored_session(&self) -> bool;
 }
 
 pub struct KeyringSessionStore;
 
 impl SessionStore for KeyringSessionStore {
+    fn requires_stored_session(&self) -> bool {
+        true
+    }
+
     fn load(&self) -> Result<Option<Session>> {
         CredentialStore::load_session()
     }
@@ -140,6 +145,7 @@ impl SessionStore for KeyringSessionStore {
 pub struct MemorySessionStore {
     saved: StdMutex<Option<Session>>,
     gate: Arc<Gate>,
+    persistent: bool,
 }
 
 #[derive(Default)]
@@ -161,12 +167,24 @@ impl Drop for GateGuard {
 
 impl MemorySessionStore {
     #[cfg(test)]
+    pub fn persistent() -> Self {
+        Self {
+            persistent: true,
+            ..Self::default()
+        }
+    }
+
+    #[cfg(test)]
     pub fn saved(&self) -> Option<Session> {
         self.saved.lock().ok().and_then(|g| g.clone())
     }
 }
 
 impl SessionStore for MemorySessionStore {
+    fn requires_stored_session(&self) -> bool {
+        self.persistent
+    }
+
     fn load(&self) -> Result<Option<Session>> {
         Ok(self
             .saved
@@ -312,10 +330,14 @@ impl SessionAuth {
             .await
             .context("waiting for the session lock")??;
 
-        if let Some(stored) = self.store.load()?
-            && stored.refresh_token.as_str() != session.refresh_token.as_str()
-        {
-            *session = stored;
+        match self.store.load()? {
+            Some(stored) if stored.refresh_token.as_str() != session.refresh_token.as_str() => {
+                *session = stored;
+            }
+            None if self.store.requires_stored_session() => {
+                return Err(anyhow!("logged out; run `ferrvault login` again"));
+            }
+            _ => {}
         }
         if !still_stale(session) {
             return Ok(());

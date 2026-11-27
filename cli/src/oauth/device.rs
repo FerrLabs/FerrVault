@@ -6,6 +6,7 @@ use anyhow::{Result, anyhow};
 use super::idp::{DeviceAuthorization, DevicePoll, IdpClient, TokenGrant};
 
 const SLOW_DOWN_STEP: Duration = Duration::from_secs(5);
+const MAX_INTERVAL: Duration = Duration::from_secs(60);
 
 pub async fn device_login<S, F>(
     idp: &IdpClient,
@@ -19,15 +20,17 @@ where
     let auth = idp.start_device().await?;
     announce(&auth);
     let lifetime = Duration::from_secs(auth.expires_in);
-    let mut interval = Duration::from_secs(auth.interval.max(1));
+    let mut interval = Duration::from_secs(auth.interval.max(1)).min(MAX_INTERVAL);
     let mut waited = Duration::ZERO;
     loop {
         sleep(interval).await;
-        waited += interval;
+        waited = waited.saturating_add(interval);
         match idp.poll_device(&auth.device_code).await? {
             DevicePoll::Granted(grant) => return Ok(grant),
             DevicePoll::Pending => {}
-            DevicePoll::SlowDown => interval += SLOW_DOWN_STEP,
+            DevicePoll::SlowDown => {
+                interval = interval.saturating_add(SLOW_DOWN_STEP).min(MAX_INTERVAL);
+            }
             DevicePoll::Expired => return Err(anyhow!("the device code expired; run login again")),
             DevicePoll::Denied => return Err(anyhow!("login was denied in the browser")),
         }
@@ -186,5 +189,45 @@ mod tests {
         let (_server, client) = idp(600, 0, vec![(200, grant())]).await;
         let (_, sleeps) = drive(&client).await;
         assert_eq!(sleeps, secs(&[1]));
+    }
+
+    #[tokio::test]
+    async fn an_interval_near_u64_max_with_slow_down_is_capped_not_overflowed() {
+        let (_server, client) = idp(
+            600,
+            u64::MAX - 4,
+            vec![(400, error("slow_down")), (200, grant())],
+        )
+        .await;
+        let (result, sleeps) = drive(&client).await;
+        assert!(result.is_ok());
+        assert_eq!(sleeps, secs(&[60, 60]));
+    }
+
+    #[tokio::test]
+    async fn a_huge_interval_and_lifetime_poll_at_the_cap_without_overflow() {
+        let (_server, client) = idp(
+            u64::MAX,
+            1 << 63,
+            vec![
+                (400, error("authorization_pending")),
+                (400, error("authorization_pending")),
+                (200, grant()),
+            ],
+        )
+        .await;
+        let (result, sleeps) = drive(&client).await;
+        assert!(result.is_ok());
+        assert_eq!(sleeps, secs(&[60, 60, 60]));
+    }
+
+    #[tokio::test]
+    async fn slow_down_stops_growing_at_the_cap() {
+        let mut polls = vec![(400, error("slow_down")); 15];
+        polls.push((200, grant()));
+        let (_server, client) = idp(100_000, 55, polls).await;
+        let (_, sleeps) = drive(&client).await;
+        assert!(sleeps.iter().all(|d| *d <= Duration::from_secs(60)));
+        assert_eq!(sleeps.last(), Some(&Duration::from_secs(60)));
     }
 }
