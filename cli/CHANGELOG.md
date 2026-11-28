@@ -4,6 +4,12 @@ All notable changes to `ferrvault-cli` will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.1.1] - 2026-11-28
+
+### Bug Fixes
+
+- fix(cli): resolve identity endpoints through discovery and fall back to device login (#394)
+
 ## [1.1.0] - 2026-11-27
 
 ### Features
