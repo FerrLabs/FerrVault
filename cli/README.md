@@ -23,6 +23,9 @@ ferrvault login --url https://api.ferrvault.example.com
 # Host without a browser: prints a short code to confirm on another device.
 ferrvault login --url https://api.ferrvault.example.com --device
 
+# Internal deployment with a private CA and its own identity provider.
+ferrvault --ca-cert ~/ca.pem login --url https://api.ferrvault.example --device --idp-url https://auth.example
+
 # Several organizations, vaults or environments? Pick them up front (or answer
 # the prompt). --org takes the organization id.
 ferrvault login --url https://api.ferrvault.example.com --org <org-id> --vault payments --env default
@@ -54,7 +57,24 @@ environment chosen at login (re-run `login` to change them). With a session,
 `get --names` is all-or-nothing: one missing name fails the whole call.
 
 The identity provider defaults to `https://auth.ferrlabs.com`
-(`--idp-url` / `FERRVAULT_IDP_URL` to override). `--ca-cert` and
+(`--idp-url` / `FERRVAULT_IDP_URL` to override).
+
+The endpoints are resolved through the provider's discovery document
+(`/.well-known/oauth-authorization-server/api`, then
+`/.well-known/oauth-authorization-server`, then
+`/api/.well-known/oauth-authorization-server`), so `--idp-url` works with or
+without `/api` and with a trailing slash. If the URL answers with a web page
+instead of JSON (the static front end), `login` fails and names the URL it
+called and the `<idp>/api` URL to try. The refresh token is sent to the issuer
+the discovery document advertises, and an https provider cannot downgrade its
+endpoints to http.
+
+When no browser can be opened (no `DISPLAY`, `WAYLAND_DISPLAY` or `BROWSER` on
+Linux, or the platform opener exits non-zero), `login` switches to the device
+flow by itself and prints the code to confirm on another device.
+
+`login` checks the keyring first, by writing and deleting a throwaway entry,
+and exits before any code is shown if the keyring is not usable. `--ca-cert` and
 `--insecure-skip-verify` apply to it as well; `--client-cert` and
 `--pin-sha256` apply only to the FerrVault API.
 
@@ -120,6 +140,18 @@ store:
 There is no fallback to a plain file on disk. If no keyring is
 available, `login` fails loudly. CI environments should pass a SAT
 via `FERRVAULT_TOKEN` instead of using `login`.
+
+On a headless Linux host the Secret Service often has no unlocked default
+collection (`SS error: result not returned from SS API`). Unlock one, with the
+passphrase in `$KEYRING_PASSWORD`:
+
+```bash
+systemctl --user stop gnome-keyring-daemon.service gnome-keyring-daemon.socket
+printf '%s' "$KEYRING_PASSWORD" | gnome-keyring-daemon --daemonize --login
+gnome-keyring-daemon --start --components=secrets
+```
+
+or skip the keyring and use a service token with `FERRVAULT_TOKEN`.
 
 An OAuth session is a user-wide credential (every org and vault the account
 can reach), unlike a SAT, which is bound to one vault. The CLI never prints
