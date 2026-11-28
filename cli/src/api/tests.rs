@@ -233,10 +233,7 @@ async fn session_reveal_all_lists_first_and_chunks_of_one_hundred() {
 async fn session_writes_use_the_environment_routes() {
     let api = MockServer::start(|r| {
         if r.method_path().starts_with("DELETE") {
-            MockResponse {
-                status: 204,
-                body: String::new(),
-            }
+            MockResponse::empty(204)
         } else {
             MockResponse::json(200, &json!({}))
         }

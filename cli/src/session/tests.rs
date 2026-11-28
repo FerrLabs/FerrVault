@@ -188,10 +188,7 @@ async fn a_persistent_store_with_the_session_still_refreshes() {
 async fn sign_out_sends_the_access_token_as_bearer_and_never_the_refresh_token() {
     let idp = MockServer::start(|r| {
         assert_eq!(r.path, "/auth/logout");
-        MockResponse {
-            status: 204,
-            body: String::new(),
-        }
+        MockResponse::empty(204)
     })
     .await;
     let auth = auth_for(&idp, session(900), Arc::new(MemorySessionStore::default()));
@@ -211,10 +208,7 @@ async fn sign_out_with_an_expired_access_token_refreshes_first() {
                 &json!({"token":"new-access","refresh_token":"new-refresh","expires_in":900}),
             )
         } else {
-            MockResponse {
-                status: 204,
-                body: String::new(),
-            }
+            MockResponse::empty(204)
         }
     })
     .await;

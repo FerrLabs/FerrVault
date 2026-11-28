@@ -37,6 +37,7 @@ impl Recorded {
 pub struct MockResponse {
     pub status: u16,
     pub body: String,
+    pub content_type: &'static str,
 }
 
 impl MockResponse {
@@ -44,6 +45,23 @@ impl MockResponse {
         Self {
             status,
             body: body.to_string(),
+            content_type: "application/json",
+        }
+    }
+
+    pub fn html(status: u16, body: &str) -> Self {
+        Self {
+            status,
+            body: body.to_owned(),
+            content_type: "text/html",
+        }
+    }
+
+    pub fn empty(status: u16) -> Self {
+        Self {
+            status,
+            body: String::new(),
+            content_type: "application/json",
         }
     }
 }
@@ -76,8 +94,9 @@ impl MockServer {
                     let resp = handler(&req);
                     log.lock().unwrap().push(req);
                     let out = format!(
-                        "HTTP/1.1 {} X\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                        "HTTP/1.1 {} X\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
                         resp.status,
+                        resp.content_type,
                         resp.body.len(),
                         resp.body
                     );
