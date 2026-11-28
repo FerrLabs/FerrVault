@@ -56,6 +56,21 @@ fn set_native_default_store() -> Result<(), String> {
 pub struct CredentialStore;
 
 impl CredentialStore {
+    pub fn probe() -> Result<()> {
+        let name = format!(
+            "probe-{}-{:016x}",
+            std::process::id(),
+            getrandom::u64().map_err(|e| anyhow!("generating probe name: {e}"))?
+        );
+        let entry = open_entry(&name, "probe")?;
+        entry
+            .set_password("probe")
+            .context("writing a probe entry to the OS keyring")?;
+        entry
+            .delete_credential()
+            .context("deleting the probe entry from the OS keyring")
+    }
+
     pub fn save_token(token: &str) -> Result<()> {
         open_entry(TOKEN_KEY, "token")?
             .set_password(token)
@@ -149,5 +164,43 @@ fn get_secret(key: &str, slot: &str) -> Result<Option<Zeroizing<String>>> {
         Ok(p) => Ok(Some(Zeroizing::new(p))),
         Err(KeyringError::NoEntry) => Ok(None),
         Err(e) => Err(anyhow!("reading {slot} from OS keyring: {e}")),
+    }
+}
+
+const HEADLESS_RECIPE: &str = "On a headless Linux host, unlock a Secret Service collection first:
+  systemctl --user stop gnome-keyring-daemon.service gnome-keyring-daemon.socket
+  printf '%s' \"$KEYRING_PASSWORD\" | gnome-keyring-daemon --daemonize --login
+  gnome-keyring-daemon --start --components=secrets
+Or skip the keyring: create a service token and run with FERRVAULT_TOKEN=fvsat_... instead of `ferrvault login`.";
+
+pub fn unavailable_error(cause: &anyhow::Error, linux: bool) -> anyhow::Error {
+    let head = format!(
+        "the OS keyring is not usable, so login would fail after you approve it ({cause:#}). Nothing was started."
+    );
+    if linux {
+        anyhow!("{head}\n{HEADLESS_RECIPE}")
+    } else {
+        anyhow!("{head}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn linux_errors_carry_the_headless_recipe_and_the_token_alternative() {
+        let cause = anyhow!("SS error: result not returned from SS API");
+        let text = unavailable_error(&cause, true).to_string();
+        assert!(text.contains("result not returned from SS API"));
+        assert!(text.contains("gnome-keyring-daemon --daemonize --login"));
+        assert!(text.contains("FERRVAULT_TOKEN"));
+    }
+
+    #[test]
+    fn other_platforms_get_the_cause_without_linux_instructions() {
+        let text = unavailable_error(&anyhow!("denied"), false).to_string();
+        assert!(text.contains("denied"));
+        assert!(!text.contains("gnome-keyring"));
     }
 }

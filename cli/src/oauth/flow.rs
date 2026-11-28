@@ -1,56 +1,56 @@
 use std::time::Duration;
 
-use anyhow::{Context, Result};
+use anyhow::Context;
 use reqwest::Url;
+use thiserror::Error;
 
 use super::CLIENT_ID;
-use super::idp::{IdpClient, TokenGrant, endpoint};
+use super::idp::{IdpClient, TokenGrant};
 use super::loopback::CallbackServer;
 use super::pkce::{Pkce, random_state};
 
 const CALLBACK_TIMEOUT: Duration = Duration::from_secs(300);
-const AUTHORIZE_SEGMENT: &str = "authorize";
 
-pub async fn browser_login(idp: &IdpClient, open: impl FnOnce(&Url)) -> Result<TokenGrant> {
+#[derive(Debug, Error)]
+pub enum BrowserLoginError {
+    #[error("could not open a browser ({0})")]
+    NoBrowser(String),
+    #[error(transparent)]
+    Failed(#[from] anyhow::Error),
+}
+
+pub async fn browser_login(
+    idp: &IdpClient,
+    open: impl FnOnce(&Url) -> Result<(), String>,
+) -> Result<TokenGrant, BrowserLoginError> {
     let server = CallbackServer::bind().await?;
     let redirect_uri = server.redirect_uri();
     let pkce = Pkce::generate()?;
     let state = random_state()?;
-    let url = authorize_url(idp.base(), &redirect_uri, pkce.challenge(), &state)?;
-    open(&url);
+    let url = authorize_url(
+        &idp.authorization_url().context("building authorize URL")?,
+        &redirect_uri,
+        pkce.challenge(),
+        &state,
+    );
+    open(&url).map_err(BrowserLoginError::NoBrowser)?;
     let code = server.wait_for_code(&state, CALLBACK_TIMEOUT).await?;
-    idp.exchange(&code, &redirect_uri, pkce.verifier())
+    let grant = idp
+        .exchange(&code, &redirect_uri, pkce.verifier())
         .await
-        .context("exchanging the authorization code")
+        .context("exchanging the authorization code")?;
+    Ok(grant)
 }
 
-pub fn authorize_url(base: &Url, redirect_uri: &str, challenge: &str, state: &str) -> Result<Url> {
-    let mut url = endpoint(base, &[AUTHORIZE_SEGMENT]).context("building authorize URL")?;
+pub fn authorize_url(endpoint: &Url, redirect_uri: &str, challenge: &str, state: &str) -> Url {
+    let mut url = endpoint.clone();
     url.query_pairs_mut()
         .append_pair("client_id", CLIENT_ID)
         .append_pair("redirect_uri", redirect_uri)
         .append_pair("code_challenge", challenge)
         .append_pair("code_challenge_method", "S256")
         .append_pair("state", state);
-    Ok(url)
-}
-
-pub fn open_in_browser(url: &Url) {
-    eprintln!("ferrvault: opening your browser to log in. If it does not open, visit:\n{url}");
-    let launched = if cfg!(target_os = "macos") {
-        std::process::Command::new("open").arg(url.as_str()).spawn()
-    } else if cfg!(target_os = "windows") {
-        std::process::Command::new("rundll32")
-            .args(["url.dll,FileProtocolHandler", url.as_str()])
-            .spawn()
-    } else {
-        std::process::Command::new("xdg-open")
-            .arg(url.as_str())
-            .spawn()
-    };
-    if launched.is_err() {
-        eprintln!("ferrvault: could not launch a browser; open the URL above manually.");
-    }
+    url
 }
 
 #[cfg(test)]
@@ -83,19 +83,23 @@ mod tests {
 
     #[test]
     fn a_path_prefix_on_the_idp_url_is_kept() {
-        let base = Url::parse("https://host.example/tenant").unwrap();
-        let url = authorize_url(&base, "http://127.0.0.1:1/callback", "c", "s").unwrap();
+        let client = |raw: &str| {
+            IdpClient::with_http(Url::parse(raw).unwrap(), crate::testing::http_client())
+        };
+        let url = client("https://host.example/tenant")
+            .authorization_url()
+            .unwrap();
         assert_eq!(url.path(), "/tenant/authorize");
-        let trailing = Url::parse("https://host.example/tenant/").unwrap();
-        assert_eq!(
-            endpoint(&trailing, &["auth", "refresh"]).unwrap().path(),
-            "/tenant/auth/refresh"
-        );
-        let root = Url::parse("https://auth.ferrlabs.com").unwrap();
-        assert_eq!(
-            endpoint(&root, &["auth", "refresh"]).unwrap().path(),
-            "/auth/refresh"
-        );
+        let trailing = client("https://host.example/tenant/")
+            .authorization_url()
+            .unwrap();
+        assert_eq!(trailing.path(), "/tenant/authorize");
+        let root = client("https://auth.ferrlabs.com")
+            .authorization_url()
+            .unwrap();
+        assert_eq!(root.path(), "/authorize");
+        let built = authorize_url(&url, "http://127.0.0.1:1/callback", "c", "s");
+        assert_eq!(built.path(), "/tenant/authorize");
     }
 
     fn query(url: &Url, key: &str) -> String {
@@ -121,6 +125,7 @@ mod tests {
         let grant = browser_login(&idp_for(&idp), |url| {
             seen = Some(url.clone());
             call_back(url, "the-code", None);
+            Ok(())
         })
         .await
         .unwrap();
@@ -151,6 +156,7 @@ mod tests {
         browser_login(&idp_for(&idp), |url| {
             call_back(url, "attacker-code", Some("attacker-state"));
             call_back(url, "the-code", None);
+            Ok(())
         })
         .await
         .unwrap();
@@ -167,11 +173,32 @@ mod tests {
             "{:#}",
             browser_login(&idp_for(&idp), |url| {
                 call_back(url, "the-code", None);
+                Ok(())
             })
             .await
             .err()
             .unwrap()
         );
         assert!(err.contains("invalid_grant"), "{err}");
+    }
+}
+
+#[cfg(test)]
+mod launch_tests {
+    use serde_json::json;
+
+    use super::*;
+    use crate::testing::{MockResponse, MockServer};
+
+    #[tokio::test]
+    async fn a_failed_launch_is_reported_before_waiting_for_a_callback() {
+        let idp = MockServer::start(|_| MockResponse::json(200, &json!({}))).await;
+        let client = IdpClient::with_http(idp.url.clone(), crate::testing::http_client());
+        let err = browser_login(&client, |_| Err("xdg-open exited with 3".into()))
+            .await
+            .err()
+            .unwrap();
+        assert!(matches!(err, BrowserLoginError::NoBrowser(m) if m.contains("xdg-open")));
+        assert!(idp.requests().is_empty());
     }
 }

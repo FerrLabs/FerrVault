@@ -7,6 +7,7 @@ use thiserror::Error;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use super::CLIENT_ID;
+use super::discovery::{Endpoints, api_url, discover, is_html_content_type};
 use crate::tls::{TlsOptions, build_client};
 
 const DEVICE_GRANT_TYPE: &str = "urn:ietf:params:oauth:grant-type:device_code";
@@ -21,6 +22,14 @@ pub enum IdpError {
     Unavailable(u16),
     #[error("unexpected identity provider response: {0}")]
     Malformed(String),
+    #[error(
+        "{url} answered with a web page instead of JSON (status {status}); this looks like the web front end, not the identity API. Did you mean --idp-url {suggestion}?"
+    )]
+    NotAnApi {
+        url: String,
+        status: u16,
+        suggestion: String,
+    },
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -89,6 +98,7 @@ struct ErrorBody {
 pub struct IdpClient {
     http: Client,
     base: Url,
+    discovered: Option<Endpoints>,
 }
 
 impl IdpClient {
@@ -96,12 +106,57 @@ impl IdpClient {
         Ok(Self {
             http: build_client(tls)?,
             base,
+            discovered: None,
+        })
+    }
+
+    pub async fn resolve(base: Url, tls: &TlsOptions<'_>) -> Result<Self> {
+        Ok(Self::resolve_with(base, build_client(tls)?).await?)
+    }
+
+    pub async fn resolve_with(base: Url, http: Client) -> Result<Self, IdpError> {
+        Ok(match discover(&http, &base).await? {
+            Some(found) => Self {
+                http,
+                base: found.issuer,
+                discovered: Some(found.endpoints),
+            },
+            None => Self {
+                http,
+                base,
+                discovered: None,
+            },
         })
     }
 
     #[cfg(test)]
     pub fn with_http(base: Url, http: Client) -> Self {
-        Self { http, base }
+        Self {
+            http,
+            base,
+            discovered: None,
+        }
+    }
+
+    pub fn authorization_url(&self) -> Result<Url, IdpError> {
+        match &self.discovered {
+            Some(e) => Ok(e.authorization.clone()),
+            None => endpoint(&self.base, &["authorize"]),
+        }
+    }
+
+    fn token_url(&self) -> Result<Url, IdpError> {
+        match &self.discovered {
+            Some(e) => Ok(e.token.clone()),
+            None => endpoint(&self.base, &["auth", "exchange"]),
+        }
+    }
+
+    fn device_authorization_url(&self) -> Result<Url, IdpError> {
+        match &self.discovered {
+            Some(e) => Ok(e.device_authorization.clone()),
+            None => endpoint(&self.base, &["auth", "device", "code"]),
+        }
     }
 
     pub fn base(&self) -> &Url {
@@ -116,7 +171,7 @@ impl IdpClient {
     ) -> Result<TokenGrant, IdpError> {
         let (status, body) = self
             .post(
-                &["auth", "exchange"],
+                self.token_url()?,
                 &json!({
                     "code": code,
                     "client_id": CLIENT_ID,
@@ -131,7 +186,7 @@ impl IdpClient {
     pub async fn refresh(&self, refresh_token: &str) -> Result<TokenGrant, IdpError> {
         let (status, body) = self
             .post(
-                &["auth", "refresh"],
+                endpoint(&self.base, &["auth", "refresh"])?,
                 &json!({ "client_id": CLIENT_ID, "refresh_token": refresh_token }),
             )
             .await?;
@@ -152,7 +207,7 @@ impl IdpClient {
     pub async fn start_device(&self) -> Result<DeviceAuthorization, IdpError> {
         let (status, body) = self
             .post(
-                &["auth", "device", "code"],
+                self.device_authorization_url()?,
                 &json!({ "client_id": CLIENT_ID }),
             )
             .await?;
@@ -165,7 +220,7 @@ impl IdpClient {
     pub async fn poll_device(&self, device_code: &str) -> Result<DevicePoll, IdpError> {
         let (status, body) = self
             .post(
-                &["auth", "device", "token"],
+                endpoint(&self.base, &["auth", "device", "token"])?,
                 &json!({
                     "client_id": CLIENT_ID,
                     "grant_type": DEVICE_GRANT_TYPE,
@@ -187,13 +242,20 @@ impl IdpClient {
 
     async fn post(
         &self,
-        route: &[&str],
+        url: Url,
         body: &serde_json::Value,
     ) -> Result<(StatusCode, String), IdpError> {
-        let url = endpoint(&self.base, route)?;
-        let resp = self.http.post(url).json(body).send().await?;
+        let resp = self.http.post(url.clone()).json(body).send().await?;
         let status = resp.status();
+        let html = is_html_content_type(resp.headers().get(reqwest::header::CONTENT_TYPE));
         let text = resp.text().await?;
+        if html {
+            return Err(IdpError::NotAnApi {
+                url: url.to_string(),
+                status: status.as_u16(),
+                suggestion: api_url(&self.base)?.to_string(),
+            });
+        }
         Ok((status, text))
     }
 }

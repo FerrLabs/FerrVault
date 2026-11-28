@@ -12,11 +12,12 @@ use super::select::pick;
 use crate::api::{ApiClient, ApiConfig, Auth, TlsArgs};
 use crate::cli::{Cli, LoginArgs};
 use crate::oauth::DEFAULT_IDP_URL;
+use crate::oauth::browser::{browser_available, open_in_browser};
 use crate::oauth::device::device_login;
-use crate::oauth::flow::{browser_login, open_in_browser};
-use crate::oauth::idp::{DeviceAuthorization, IdpClient};
+use crate::oauth::flow::{BrowserLoginError, browser_login};
+use crate::oauth::idp::{DeviceAuthorization, IdpClient, TokenGrant};
 use crate::session::{KeyringSessionStore, MemorySessionStore, Session, SessionAuth, SessionStore};
-use crate::storage::CredentialStore;
+use crate::storage::{CredentialStore, unavailable_error};
 use crate::tls::TlsOptions;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -36,7 +37,23 @@ fn choose_method(device: bool, wants_sat: bool, stdin_tty: bool) -> Method {
     }
 }
 
+fn without_browser(method: Method, browser: bool) -> Method {
+    match method {
+        Method::Browser if !browser => Method::Device,
+        other => other,
+    }
+}
+
 pub async fn run(args: &LoginArgs, cli: &Cli) -> Result<()> {
+    run_with_probe(args, cli, CredentialStore::probe).await
+}
+
+async fn run_with_probe(
+    args: &LoginArgs,
+    cli: &Cli,
+    probe: impl FnOnce() -> Result<()>,
+) -> Result<()> {
+    probe().map_err(|e| unavailable_error(&e, cfg!(target_os = "linux")))?;
     let url_raw = args
         .url
         .clone()
@@ -51,11 +68,20 @@ pub async fn run(args: &LoginArgs, cli: &Cli) -> Result<()> {
     if args.device && cli.token.is_some() {
         return Err(anyhow!("--device cannot be combined with a token"));
     }
-    let method = choose_method(
-        args.device,
-        args.with_token || cli.token.is_some(),
-        std::io::stdin().is_terminal(),
+    let browser = browser_available();
+    let method = without_browser(
+        choose_method(
+            args.device,
+            args.with_token || cli.token.is_some(),
+            std::io::stdin().is_terminal(),
+        ),
+        browser,
     );
+    if method == Method::Device && !args.device && !browser {
+        eprintln!(
+            "ferrvault: no browser available (no DISPLAY, WAYLAND_DISPLAY or BROWSER); using the device flow."
+        );
+    }
     match method {
         Method::Sat => sat_login(url, cli, tls).await,
         Method::Device => oauth_login(url, args, tls, true).await,
@@ -101,14 +127,10 @@ async fn sat_login(url: Url, cli: &Cli, tls: TlsArgs<'_>) -> Result<()> {
 async fn oauth_login(url: Url, args: &LoginArgs, tls: TlsArgs<'_>, device: bool) -> Result<()> {
     let idp_raw = args.idp_url.as_deref().unwrap_or(DEFAULT_IDP_URL);
     let idp_url = require_https(idp_raw, "identity provider URL")?;
-    let idp = IdpClient::new(idp_url.clone(), &idp_tls_options(&tls))?;
+    let idp = IdpClient::resolve(idp_url, &idp_tls_options(&tls)).await?;
 
-    let grant = if device {
-        device_login(&idp, announce_device, tokio::time::sleep).await?
-    } else {
-        browser_login(&idp, open_in_browser).await?
-    };
-    let session = Session::from_grant(idp_url.as_str(), &grant, Utc::now())
+    let grant = authenticate(&idp, device, open_in_browser, tokio::time::sleep).await?;
+    let session = Session::from_grant(idp.base().as_str(), &grant, Utc::now())
         .context("reading the login response")?;
     drop(grant);
 
@@ -144,6 +166,28 @@ async fn oauth_login(url: Url, args: &LoginArgs, tls: TlsArgs<'_>, device: bool)
         session.environment.as_deref().unwrap_or("-"),
     );
     Ok(())
+}
+
+async fn authenticate<S, F>(
+    idp: &IdpClient,
+    device: bool,
+    open: impl FnOnce(&Url) -> Result<(), String>,
+    sleep: S,
+) -> Result<TokenGrant>
+where
+    S: Fn(std::time::Duration) -> F,
+    F: std::future::Future<Output = ()>,
+{
+    if !device {
+        match browser_login(idp, open).await {
+            Ok(grant) => return Ok(grant),
+            Err(BrowserLoginError::Failed(e)) => return Err(e),
+            Err(e @ BrowserLoginError::NoBrowser(_)) => {
+                eprintln!("ferrvault: {e}; using the device flow.");
+            }
+        }
+    }
+    device_login(idp, announce_device, sleep).await
 }
 
 async fn select_or_sign_out(
@@ -235,6 +279,13 @@ mod tests {
     }
 
     #[test]
+    fn a_browser_login_without_a_browser_becomes_the_device_flow() {
+        assert_eq!(without_browser(Method::Browser, false), Method::Device);
+        assert_eq!(without_browser(Method::Browser, true), Method::Browser);
+        assert_eq!(without_browser(Method::Sat, false), Method::Sat);
+    }
+
+    #[test]
     fn device_flag_selects_device_flow_with_or_without_a_terminal() {
         assert_eq!(choose_method(true, false, false), Method::Device);
         assert_eq!(choose_method(true, false, true), Method::Device);
@@ -276,11 +327,7 @@ mod tests {
                 other => panic!("unexpected {other}"),
             })
             .await;
-            let idp = MockServer::start(|_| MockResponse {
-                status: 204,
-                body: String::new(),
-            })
-            .await;
+            let idp = MockServer::start(|_| MockResponse::empty(204)).await;
             let session = Session {
                 idp_url: idp.url.to_string(),
                 access_token: Zeroizing::new("t".into()),
@@ -327,6 +374,161 @@ mod tests {
             let logout = idp.requests_to("/auth/logout");
             assert_eq!(logout.len(), 1);
             assert_eq!(logout[0].header("authorization"), Some("Bearer t"));
+        }
+    }
+
+    mod flows {
+        use clap::Parser;
+        use serde_json::{Value, json};
+
+        use super::super::*;
+        use crate::cli::Command;
+        use crate::oauth::idp::IdpError;
+        use crate::testing::{MockResponse, MockServer, http_client};
+
+        fn discovery(r: &crate::testing::Recorded) -> Value {
+            let host = format!("http://{}", r.header("host").unwrap());
+            json!({
+                "issuer": format!("{host}/api"),
+                "authorization_endpoint": format!("{host}/authorize"),
+                "device_authorization_endpoint": format!("{host}/api/auth/device/code"),
+                "token_endpoint": format!("{host}/api/auth/exchange"),
+            })
+        }
+
+        async fn identity_behind_a_front_end() -> MockServer {
+            MockServer::start(|r| match r.path.as_str() {
+                "/.well-known/oauth-authorization-server/api" => {
+                    MockResponse::json(200, &discovery(r))
+                }
+                "/api/auth/device/code" => MockResponse::json(
+                    200,
+                    &json!({
+                        "device_code": "dev-1",
+                        "user_code": "ABCD-EFGH",
+                        "verification_uri": "https://auth.example/device",
+                        "expires_in": 600,
+                        "interval": 1,
+                    }),
+                ),
+                "/api/auth/device/token" => MockResponse::json(
+                    200,
+                    &json!({"token":"access-1","refresh_token":"refresh-1","expires_in":900}),
+                ),
+                _ => MockResponse::html(405, "<html>405 Not Allowed</html>"),
+            })
+            .await
+        }
+
+        async fn resolve(idp: &str) -> Result<IdpClient, IdpError> {
+            IdpClient::resolve_with(Url::parse(idp).unwrap(), http_client()).await
+        }
+
+        async fn no_sleep(_: std::time::Duration) {}
+
+        #[tokio::test]
+        async fn the_device_flow_works_without_api_in_the_idp_url() {
+            let server = identity_behind_a_front_end().await;
+            let idp = resolve(server.url.as_str()).await.unwrap();
+            let grant = authenticate(&idp, true, |_| Ok(()), no_sleep)
+                .await
+                .unwrap();
+            assert_eq!(grant.token, "access-1");
+            assert_eq!(idp.base().path(), "/api");
+            assert_eq!(server.requests_to("/api/auth/device/code").len(), 1);
+            assert_eq!(server.requests_to("/auth/device/code").len(), 0);
+        }
+
+        #[tokio::test]
+        async fn the_device_flow_works_with_api_and_trailing_slashes_in_the_idp_url() {
+            let server = identity_behind_a_front_end().await;
+            for suffix in ["api", "api/"] {
+                let idp = resolve(&format!("{}{suffix}", server.url)).await.unwrap();
+                let grant = authenticate(&idp, true, |_| Ok(()), no_sleep)
+                    .await
+                    .unwrap();
+                assert_eq!(grant.token, "access-1");
+                assert_eq!(idp.base().path(), "/api");
+            }
+            assert_eq!(server.requests_to("/auth/device/code").len(), 0);
+        }
+
+        #[tokio::test]
+        async fn a_front_end_without_discovery_gives_the_actionable_error() {
+            let server = MockServer::start(|_| MockResponse::html(405, "<html>no</html>")).await;
+            let err = resolve(server.url.as_str())
+                .await
+                .err()
+                .unwrap()
+                .to_string();
+            assert!(
+                err.contains(".well-known/oauth-authorization-server"),
+                "{err}"
+            );
+            assert!(
+                err.contains(&format!("--idp-url {}api", server.url)),
+                "{err}"
+            );
+        }
+
+        #[tokio::test]
+        async fn a_front_end_hiding_behind_a_missing_discovery_document_is_still_named() {
+            let server = MockServer::start(|r| {
+                if r.path.contains(".well-known") {
+                    MockResponse::json(404, &json!({}))
+                } else {
+                    MockResponse::html(405, "<html>no</html>")
+                }
+            })
+            .await;
+            let idp = resolve(server.url.as_str()).await.unwrap();
+            let err = authenticate(&idp, true, |_| Ok(()), no_sleep)
+                .await
+                .err()
+                .unwrap()
+                .to_string();
+            assert!(err.contains("/auth/device/code"), "{err}");
+            assert!(err.contains("--idp-url"), "{err}");
+        }
+
+        #[tokio::test]
+        async fn a_browser_that_cannot_open_falls_back_to_the_device_flow() {
+            let server = identity_behind_a_front_end().await;
+            let idp = resolve(server.url.as_str()).await.unwrap();
+            let grant = authenticate(
+                &idp,
+                false,
+                |_| Err("xdg-open exited with 3".into()),
+                no_sleep,
+            )
+            .await
+            .unwrap();
+            assert_eq!(grant.token, "access-1");
+            assert_eq!(server.requests_to("/api/auth/device/code").len(), 1);
+        }
+
+        #[tokio::test]
+        async fn a_keyring_that_fails_the_probe_stops_login_before_any_idp_request() {
+            let server = identity_behind_a_front_end().await;
+            let cli = Cli::parse_from([
+                "ferrvault",
+                "login",
+                "--url",
+                "https://api.example",
+                "--device",
+                "--idp-url",
+                server.url.as_str(),
+            ]);
+            let Command::Login(args) = &cli.command else {
+                unreachable!()
+            };
+            let err = run_with_probe(args, &cli, || Err(anyhow!("SS error")))
+                .await
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("SS error"), "{err}");
+            assert!(err.contains("keyring"), "{err}");
+            assert!(server.requests().is_empty());
         }
     }
 }

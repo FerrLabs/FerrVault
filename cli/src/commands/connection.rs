@@ -168,4 +168,26 @@ mod tests {
         assert!(require_https("http://v.example", "api-url").is_err());
         assert!(require_https("https://v.example", "api-url").is_ok());
     }
+
+    #[test]
+    fn the_identity_provider_gets_the_ca_cert_but_not_the_api_client_identity() {
+        let cli = Cli::parse_from([
+            "ferrvault",
+            "--ca-cert",
+            "/etc/ca.pem",
+            "--client-cert",
+            "/etc/c.pem",
+            "--client-key",
+            "/etc/k.pem",
+            "--pin-sha256",
+            "pin",
+            "whoami",
+        ]);
+        let tls = tls_args(&cli).unwrap();
+        let opts = idp_tls_options(&tls);
+        assert_eq!(opts.ca_cert_path, Some(std::path::Path::new("/etc/ca.pem")));
+        assert!(opts.client_cert_path.is_none());
+        assert!(opts.client_key_path.is_none());
+        assert!(opts.pin_sha256_b64.is_none());
+    }
 }

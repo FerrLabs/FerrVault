@@ -1,4 +1,6 @@
+pub mod browser;
 pub mod device;
+pub mod discovery;
 pub mod flow;
 pub mod idp;
 pub mod loopback;
